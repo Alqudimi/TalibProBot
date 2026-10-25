@@ -2,7 +2,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from src.app.bot.handlers import admin, catalog, orders, payments, profile, start, study
+from src.app.bot.handlers import admin, catalog, orders, payments, profile, services, start, study
 from src.app.bot.middlewares.db import DatabaseSessionMiddleware
 from src.app.bot.middlewares.throttling import ThrottlingMiddleware
 from src.app.bot.middlewares.user import UserRegistrationMiddleware
@@ -47,6 +47,7 @@ class Application:
         self.dp.include_routers(
             start.router,
             catalog.router,
+            services.router,
             orders.router,
             payments.router,
             study.router,

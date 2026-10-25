@@ -19,8 +19,26 @@ ACADEMIC_CHEATING_KEYWORDS = [
     re.compile(r"(ادخل|حل|امتحن|اختبر|احضر)\s+(عني|بدلي|بدلا مني|مكاني).*(الاختبار|الامتحان|الكويز|المقابلة|التقييم|الأسئلة)", re.IGNORECASE),
     re.compile(r"تسريب\s+.*(اسئلة|امتحان|اختبار|كويز)", re.IGNORECASE),
     re.compile(r"(اكتب|سوي|اعمل)\s+(لي\s+)?(بحث|مشروع|تقرير)\s+(كامل\s+)?(عني|باسمي)\s+(لأقدمه|لتسليمه)", re.IGNORECASE),
+    re.compile(r"(قاعة|أثناء|وقت)\s+.*(اختبار|امتحان|كويز)", re.IGNORECASE),
+    re.compile(r"حل\s+.*(لتسليمه|تسليمه)\s+(فوراً|فورا|مباشرة|الآن)", re.IGNORECASE),
 ]
 
+
+
+class AcademicIntegrityFilter:
+    """Helper filter for screening prompts for academic integrity."""
+
+    @staticmethod
+    def validate_request(prompt_text: str) -> tuple[bool, str]:
+        if not prompt_text:
+            return True, ""
+        for pattern in ACADEMIC_CHEATING_KEYWORDS:
+            if pattern.search(prompt_text):
+                return False, (
+                    "نعتذر، تمنع سياسة النزاهة الأكاديمية حل الاختبارات الرسمية نيابة عن الطالب أو إنجاز الواجبات المباشرة. "
+                    "يمكنك طلب شرح المفاهيم، تفكيك خطوات الحل، أو التدرب على أسئلة مشابهة."
+                )
+        return True, ""
 
 
 class ServiceRequestService:
@@ -29,15 +47,10 @@ class ServiceRequestService:
     @staticmethod
     def screen_academic_integrity(prompt_text: str) -> None:
         """Enforces academic integrity rules: blocks direct exam solving or exam cheating."""
-        if not prompt_text:
-            return
-        for pattern in ACADEMIC_CHEATING_KEYWORDS:
-            if pattern.search(prompt_text):
-                logger.warning(f"Academic integrity violation flagged for prompt: {prompt_text[:100]}")
-                raise AcademicIntegrityViolationError(
-                    "نعتذر، تمنع سياسة النزاهة الأكاديمية حل الاختبارات الرسمية نيابة عن الطالب أو إنجاز الواجبات دون فهم. "
-                    "يمكنك طلب شرح المفاهيم، تفكيك خطوات الحل، أو التدرب على أسئلة مشابهة."
-                )
+        is_safe, reason = AcademicIntegrityFilter.validate_request(prompt_text)
+        if not is_safe:
+            logger.warning(f"Academic integrity violation flagged for prompt: {prompt_text[:100]}")
+            raise AcademicIntegrityViolationError(reason)
 
     @staticmethod
     async def submit_request(
