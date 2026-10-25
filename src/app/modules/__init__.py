@@ -1,0 +1,20 @@
+# Register all domain models with Base.metadata to resolve foreign key cross-references
+import src.app.modules.accounts.models
+import src.app.modules.access_control.models
+import src.app.modules.catalog.models
+import src.app.modules.orders.models
+import src.app.modules.payments.models
+import src.app.modules.subscriptions.models
+import src.app.modules.entitlements.models
+import src.app.modules.service_requests.models
+import src.app.modules.delivery.models
+import src.app.modules.education.models
+import src.app.modules.providers.models
+import src.app.modules.bookings.models
+import src.app.modules.opportunities.models
+import src.app.modules.institutions.models
+import src.app.modules.notifications.models
+import src.app.modules.support.models
+import src.app.modules.reviews.models
+import src.app.modules.files.models
+import src.app.modules.audit.models

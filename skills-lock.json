@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "skills": {
+    "aiogram-add-shortcut": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/aiogram-add-shortcut/SKILL.md",
+      "computedHash": "28b7deeffca80aa9125fbebc82c0e51c4b327e3964d8f9b62b0ddc2c3e412dc1"
+    },
+    "aiogram-api-changelog": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/aiogram-api-changelog/SKILL.md",
+      "computedHash": "fc282792f740e31f5d581d33ea6cc06f6c6b16d588e3bede1de6fffdd178aef2"
+    },
+    "aiogram-bugfix": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/aiogram-bugfix/SKILL.md",
+      "computedHash": "44e1975a7916cc86713ba87bc64c6d0b3b68d31833ffac02192fe4d8ab49ec98"
+    },
+    "aiogram-release": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/aiogram-release/SKILL.md",
+      "computedHash": "495810a5bef39eef009d01e2c114dfcb9e3d0a8d19a890c0b0534afc7959e563"
+    },
+    "bot-api-bump": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/bot-api-bump/SKILL.md",
+      "computedHash": "910bb0bcbb719609bdeeb4685d6851484e80d5777243f54e537be344bc05adae"
+    },
+    "fix-codegen-imports": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/fix-codegen-imports/SKILL.md",
+      "computedHash": "4b7573dbfea5a976c80301477855b303be9133cb12b0c7a7a52ba5dd2b459979"
+    },
+    "openspec-apply-change": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/openspec-apply-change/SKILL.md",
+      "computedHash": "1f7950b0b4e9995332942dae71bb379e1d5e30e43e1b2fdaf408dd508ea09fc0"
+    },
+    "openspec-archive-change": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/openspec-archive-change/SKILL.md",
+      "computedHash": "ce4f1ef5cc88ca45bb8b68b8b1c3103f83e47e00b0959c51ff0a9723ceea943c"
+    },
+    "openspec-explore": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/openspec-explore/SKILL.md",
+      "computedHash": "24e91a936695c4c7a4595ba104da511646aa75c190c400f22d457951a3dc114f"
+    },
+    "openspec-propose": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/openspec-propose/SKILL.md",
+      "computedHash": "321342a6b4f1ee5d1e6a4a794a388d6cfb347fba9f1da2c5e56c48ab471d6cc0"
+    },
+    "openspec-sync-specs": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/openspec-sync-specs/SKILL.md",
+      "computedHash": "1ee4aba58165c16338e62de44cd016c62ae38b51be8138caba147e814686c152"
+    },
+    "openspec-update-change": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/openspec-update-change/SKILL.md",
+      "computedHash": "371b7d34af34b00f08309947e78f72e85a1fb57e0931afdedf7590222abee474"
+    },
+    "test-bot-api-codegen": {
+      "source": "aiogram/aiogram",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/test-bot-api-codegen/SKILL.md",
+      "computedHash": "9852dbf2820081f917ae70afb874bb554444c20ce9495f5862b865047204ff9f"
+    }
+  }
+}

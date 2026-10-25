@@ -1,0 +1,44 @@
+[project]
+name = "academic"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Abdulaziz Alqudimi", email = "153142076+Alqudimi@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.17.0",
+    "sqlalchemy[asyncio]>=2.0.35",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "redis>=5.2.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "cryptography>=43.0.0",
+    "aiosqlite>=0.20.0",
+]
+
+[dependency-groups]
+dev = [
+    "aiogram>=3.17.0",
+    "aiosqlite>=0.20.0",
+    "alembic>=1.14.0",
+    "asyncpg>=0.30.0",
+    "cryptography>=43.0.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-mock>=3.14.0",
+    "python-dotenv>=1.0.1",
+    "redis>=5.2.0",
+    "ruff>=0.8.0",
+    "sqlalchemy[asyncio]>=2.0.35",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
