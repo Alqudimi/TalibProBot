@@ -71,24 +71,36 @@ async def cb_show_service_card(callback: CallbackQuery, session: AsyncSession):
     service, offers = details
 
     text = f"✨ <b>{service.title_ar}</b>\n\n"
-    if service.short_summary_ar:
-        text += f"📝 <i>{service.short_summary_ar}</i>\n\n"
-    if service.description_ar:
-        text += f"{service.description_ar}\n\n"
+    if service.summary_ar:
+        text += f"📝 <i>{service.summary_ar}</i>\n\n"
 
-    text += f"⚙️ <b>طريقة التنفيذ:</b> {service.fulfillment_type}\n"
+    delivery_mode_ar = {
+        "automated_instant": "آلي فوري ⚡",
+        "human_review": "مراجعة وإشراف بشري 👨‍🏫",
+        "booking_session": "جلسة وحجز موعد 📅",
+        "file_download": "تحميل رقمي فوري 📥",
+        "configurable": "متعدد الخيارات ⚙️",
+    }.get(service.default_delivery_mode, service.default_delivery_mode or "فوري")
 
-    if service.academic_integrity_notice_ar:
-        text += f"🛡️ <b>تنبيه النزاهة:</b> {service.academic_integrity_notice_ar}\n\n"
+    text += f"⚙️ <b>طريقة التنفيذ:</b> {delivery_mode_ar}\n\n"
+
+    if service.integrity_policy_notes:
+        text += f"🛡️ <b>تنبيه النزاهة:</b> {service.integrity_policy_notes}\n\n"
+
+    if service.includes:
+        text += f"✅ <b>يشمل:</b> {service.includes}\n"
+    if service.excludes:
+        text += f"❌ <b>لا يشمل:</b> {service.excludes}\n\n"
 
     # Pricing summary
-    text += "💰 <b>خيارات الشراء والاشتراك:</b>\n"
-    for o in offers:
-        price_tag = "مجاني / تجريبي"
-        if o.prices:
-            p = o.prices[0]
-            price_tag = f"{p.price_minor} {p.currency_code}"
-        text += f"• {o.title_ar}: <b>{price_tag}</b>\n"
+    if offers:
+        text += "💰 <b>خيارات الشراء والاشتراك:</b>\n"
+        for o in offers:
+            price_tag = "مجاني / تجريبي"
+            if o.prices:
+                p = o.prices[0]
+                price_tag = f"{p.amount_minor / 100:.2f} {p.currency_code}"
+            text += f"• {o.title_ar}: <b>{price_tag}</b>\n"
 
     await callback.message.edit_text(
         text,

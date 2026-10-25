@@ -44,7 +44,7 @@ def service_card_keyboard(service_id: uuid.UUID, offers: List[ProductOffer]) -> 
         price_text = "طلب الآن"
         if offer.prices:
             first_price = offer.prices[0]
-            price_text = f"شراء ({first_price.price_minor} {first_price.currency_code})"
+            price_text = f"شراء ({first_price.amount_minor / 100:.2f} {first_price.currency_code})"
         builder.button(text=f"🛒 {offer.title_ar} - {price_text}", callback_data=f"buy:{offer.id}")
 
     builder.button(text="🔙 العودة للخدمات", callback_data="menu:catalog")

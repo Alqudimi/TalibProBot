@@ -32,6 +32,10 @@ class Order(Base):
 
     items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
+    @property
+    def payment_required(self) -> bool:
+        return self.total_minor > 0 and self.status != "paid"
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"

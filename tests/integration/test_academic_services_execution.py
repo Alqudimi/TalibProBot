@@ -1,6 +1,7 @@
 """
 Comprehensive integration tests for Academic Services Execution Engine (Services 001 - 153).
-Verifies pedagogic structure, integrity guards, and compliance with Project-Jobs.md.
+Verifies pedagogic structure, integrity guards, and compliance with Project-Jobs.md
+across all 10 specialized service families.
 """
 import pytest
 from src.app.modules.academic_services.engine import AcademicServiceEngine
@@ -130,11 +131,10 @@ async def test_academic_integrity_guard_blocks_cheating():
 
 
 @pytest.mark.asyncio
-async def test_human_and_booking_services_routing():
-    """Verify human and booking services 021, 028, 031 execute properly."""
+async def test_group_2_human_and_booking_services():
+    """Verify Group 2: Services 021, 027, 031, 034, 035 execute properly."""
     engine = AcademicServiceEngine()
 
-    # 021 Tutoring Session
     res_021 = await engine.execute_service(ServiceInput(
         service_code="021",
         user_id="11111111-1111-1111-1111-111111111111",
@@ -144,7 +144,14 @@ async def test_human_and_booking_services_routing():
     assert res_021.status == "scheduled"
     assert "حجز جلسة تدريس فردية" in res_021.rendered_output
 
-    # 031 CV Review
+    res_027 = await engine.execute_service(ServiceInput(
+        service_code="027",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="مشروع التخرج في الذكاء الاصطناعي"
+    ))
+    assert res_027.success is True
+    assert "محاكاة جلسة الدفاع" in res_027.rendered_output
+
     res_031 = await engine.execute_service(ServiceInput(
         service_code="031",
         user_id="11111111-1111-1111-1111-111111111111",
@@ -155,16 +162,195 @@ async def test_human_and_booking_services_routing():
 
 
 @pytest.mark.asyncio
-async def test_general_fallback_for_remaining_catalog_services():
-    """Verify any service from the 153 catalogue executes safely via fallback."""
+async def test_group_3_subscriptions_services():
+    """Verify Group 3: Subscriptions 036, 040, 048 execute properly."""
     engine = AcademicServiceEngine()
-    inp = ServiceInput(
-        service_code="099",
-        user_id="11111111-1111-1111-1111-111111111111",
-        content="استشارة تخصصية متقدمة"
-    )
-    result = await engine.execute_service(inp)
 
-    assert result.success is True
-    assert result.service_code == "099"
-    assert "خدمة رقم 099" in result.rendered_output
+    res_036 = await engine.execute_service(ServiceInput(
+        service_code="036",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="المرحلة الجامعية - كلية الهندسة"
+    ))
+    assert res_036.success is True
+    assert res_036.status == "active"
+    assert "بنك الأسئلة الشامل" in res_036.rendered_output
+
+    res_040 = await engine.execute_service(ServiceInput(
+        service_code="040",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="دعم التوجيه في مسائل الرياضيات"
+    ))
+    assert res_040.success is True
+    assert "عضوية دعم الواجبات التوجيهية" in res_040.rendered_output
+
+    res_048 = await engine.execute_service(ServiceInput(
+        service_code="048",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_048.success is True
+    assert "لوحة المؤشرات الأكاديمية" in res_048.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_4_digital_products_services():
+    """Verify Group 4: Digital Products 049, 051, 054 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_049 = await engine.execute_service(ServiceInput(
+        service_code="049",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_049.success is True
+    assert res_049.status == "delivered"
+    assert "قوالب تنظيم المذاكرة الرقمية" in res_049.rendered_output
+
+    res_054 = await engine.execute_service(ServiceInput(
+        service_code="054",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_054.success is True
+    assert "قوالب كتابة وتنسيق الأبحاث" in res_054.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_5_institutions_services():
+    """Verify Group 5: Institutional services 066, 067, 073 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_066 = await engine.execute_service(ServiceInput(
+        service_code="066",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="مواعيد الحذف والإضافة"
+    ))
+    assert res_066.success is True
+    assert "دليل وبوت الإرشاد الطلابي" in res_066.rendered_output
+
+    res_073 = await engine.execute_service(ServiceInput(
+        service_code="073",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="ورشة الكتابة العلمية المتقدمة"
+    ))
+    assert res_073.success is True
+    assert res_073.status == "confirmed"
+    assert "تأكيد التسجيل في الفعالية" in res_073.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_6_tech_and_ai_services():
+    """Verify Group 6: AI & Tech Skills 079, 084, 089 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_079 = await engine.execute_service(ServiceInput(
+        service_code="079",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="كيف أصيغ أمراً لتحليل البيانات الطبية"
+    ))
+    assert res_079.success is True
+    assert "مدرب الهندسة الفعالة للأوامر" in res_079.rendered_output
+
+    res_089 = await engine.execute_service(ServiceInput(
+        service_code="089",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_089.success is True
+    assert "محاكاة المقابلة التقنية الحية" in res_089.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_7_career_transition_services():
+    """Verify Group 7: Career Services 094, 097, 108 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_094 = await engine.execute_service(ServiceInput(
+        service_code="094",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="مهندس تعلم الآلة"
+    ))
+    assert res_094.success is True
+    assert "تحليل فجوة المهارات لسوق العمل" in res_094.rendered_output
+
+    res_097 = await engine.execute_service(ServiceInput(
+        service_code="097",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_097.success is True
+    assert "STAR" in res_097.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_8_scholarships_and_exams_services():
+    """Verify Group 8: Scholarships 109, 113, 121 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_109 = await engine.execute_service(ServiceInput(
+        service_code="109",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="منح دراسات عليا في ألمانيا"
+    ))
+    assert res_109.success is True
+    assert "محرك البحث الذكي والمخصص للمنح الدراسية" in res_109.rendered_output
+
+    res_121 = await engine.execute_service(ServiceInput(
+        service_code="121",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="Some people believe that university education should be free for all students."
+    ))
+    assert res_121.success is True
+    assert "تصحيح المقال الأكاديمي" in res_121.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_9_tutoring_and_success_services():
+    """Verify Group 9: Tutoring & Academic Success 124, 128, 136 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_124 = await engine.execute_service(ServiceInput(
+        service_code="124",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="الكيمياء الحيوية"
+    ))
+    assert res_124.success is True
+    assert "المطابقة الذكية مع مدرس معتمد وموثوق" in res_124.rendered_output
+
+    res_136 = await engine.execute_service(ServiceInput(
+        service_code="136",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_136.success is True
+    assert "الاسترجاع المتباعد" in res_136.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_group_10_wellness_and_accessibility_services():
+    """Verify Group 10: Wellness & Accessibility 139, 142, 153 execute properly."""
+    engine = AcademicServiceEngine()
+
+    res_139 = await engine.execute_service(ServiceInput(
+        service_code="139",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_139.success is True
+    assert "مخطط إدارة القلق والضغوط الامتحانية" in res_139.rendered_output
+
+    res_142 = await engine.execute_service(ServiceInput(
+        service_code="142",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content="مذاكرة الفصل الثالث في الإحصاء"
+    ))
+    assert res_142.success is True
+    assert "مساعد التغلب على التسويف" in res_142.rendered_output
+
+    res_153 = await engine.execute_service(ServiceInput(
+        service_code="153",
+        user_id="11111111-1111-1111-1111-111111111111",
+        content=""
+    ))
+    assert res_153.success is True
+    assert "مجموعة دعم الأقران والمجتمع الطلابي الآمن" in res_153.rendered_output

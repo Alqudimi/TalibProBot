@@ -20,23 +20,30 @@ async def main() -> None:
         worker_coro = run_task_worker(poll_interval=settings.TASK_WORKER_POLL_INTERVAL)
         tasks.append(asyncio.create_task(worker_coro, name="task_worker"))
 
-    # 2. Telegram Bot Polling task
-    async def run_bot() -> None:
-        try:
-            logger.info(f"Starting bot polling for @{settings.BOT_USERNAME}...")
-            await app.bot.delete_webhook(drop_pending_updates=True)
-            await app.dp.start_polling(app.bot)
-        except Exception as e:
-            logger.error(f"Bot polling terminated with error: {e}")
-
-    tasks.append(asyncio.create_task(run_bot(), name="telegram_bot"))
-
     # Graceful shutdown handler
     stop_event = asyncio.Event()
 
     def signal_handler() -> None:
         logger.info("Termination signal received.")
         stop_event.set()
+
+    # 2. Telegram Bot Polling task with automatic network reconnect
+    async def run_bot() -> None:
+        while not stop_event.is_set():
+            try:
+                logger.info(f"Starting bot polling for @{settings.BOT_USERNAME}...")
+                await app.bot.delete_webhook(drop_pending_updates=True)
+                await app.dp.start_polling(app.bot, handle_signals=False)
+                break
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Bot polling encountered error: {e}. Reconnecting in 5s...")
+                if stop_event.is_set():
+                    break
+                await asyncio.sleep(5)
+
+    tasks.append(asyncio.create_task(run_bot(), name="telegram_bot"))
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

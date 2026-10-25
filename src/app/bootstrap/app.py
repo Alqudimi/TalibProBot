@@ -1,7 +1,9 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
+from aiogram.types import ErrorEvent
 from src.app.bot.handlers import admin, catalog, orders, payments, profile, services, start, study
 from src.app.bot.middlewares.db import DatabaseSessionMiddleware
 from src.app.bot.middlewares.throttling import ThrottlingMiddleware
@@ -18,8 +20,10 @@ class Application:
     """Encapsulates the lifecycle, services, bot instance, and dispatcher."""
 
     def __init__(self) -> None:
+        session = AiohttpSession(timeout=60.0)
         self.bot = Bot(
             token=settings.BOT_TOKEN,
+            session=session,
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         self.dp = Dispatcher()
@@ -42,6 +46,24 @@ class Application:
         # User registration middleware
         self.dp.message.middleware(UserRegistrationMiddleware())
         self.dp.callback_query.middleware(UserRegistrationMiddleware())
+
+    def register_error_handlers(self) -> None:
+        @self.dp.error()
+        async def handle_errors(event: ErrorEvent) -> bool:
+            logger.error(f"Telegram handler error: {event.exception}", exc_info=event.exception)
+            try:
+                if event.update and event.update.callback_query:
+                    await event.update.callback_query.answer(
+                        "⚠️ حدث بطء مؤقت في الشبكة، يرجى المحاولة مرة أخرى.",
+                        show_alert=True
+                    )
+                elif event.update and event.update.message:
+                    await event.update.message.answer(
+                        "⚠️ حدث بطء مؤقت في الاتصال مع خوادم تيليجرام، يرجى إعادة إرسال الأمر."
+                    )
+            except Exception as e:
+                logger.warning(f"Could not send error response to user: {e}")
+            return True
 
     def register_routers(self) -> None:
         self.dp.include_routers(
@@ -71,6 +93,7 @@ class Application:
 
         # 3. Register handlers & middlewares
         self.register_middlewares()
+        self.register_error_handlers()
         self.register_routers()
         logger.info("Application startup completed successfully.")
 
