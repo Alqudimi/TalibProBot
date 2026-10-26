@@ -330,3 +330,13 @@ def stale_button_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🏠 القائمة الرئيسية", callback_data="home:menu")
     return builder.as_markup()
+
+
+def focus_session_keyboard(session_id: uuid.UUID) -> InlineKeyboardMarkup:
+    """Focus timer session keyboard."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ إنهاء الجلسة واحتساب الوقت", callback_data=f"focus_end:{session_id}")
+    builder.button(text="🏠 القائمة الرئيسية", callback_data="home:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
