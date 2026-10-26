@@ -1,0 +1,135 @@
+# Requires a real Telegram test user session and a dedicated test bot.
+# Run with: /home/ubuntu/tgtest-venv/bin/tgtest run tests/e2e/scenarios/public_user.yaml --env tests/e2e/.env.tgtest
+
+name: Public user - onboarding and main navigation
+steps:
+  - command: start
+  - expect:
+      has_buttons: true
+  - click: "📄 قراءة الشروط"
+  - expect:
+      contains: "الشروط"
+  - command: terms
+  - expect:
+      has_buttons: true
+  - command: help
+  - expect:
+      has_buttons: true
+  - command: menu
+  - expect:
+      buttons: ["📚 الخدمات", "🗂️ طلباتي", "🧪 مركز المذاكرة", "🎧 الدعم"]
+  - click: "📚 الخدمات"
+  - expect:
+      has_buttons: true
+  - click: "🏠 الرئيسية"
+  - expect:
+      has_buttons: true
+---
+name: Public user - catalog search and categories
+steps:
+  - command: services
+  - expect:
+      has_buttons: true
+  - click: "🔍 بحث في الكتالوج"
+  - expect:
+      has_buttons: true
+  - send: "رياضيات"
+  - expect:
+      has_buttons: true
+  - command: search
+  - expect:
+      has_buttons: true
+  - send: "برمجة"
+  - expect:
+      has_buttons: true
+  - click: "🏠 الرئيسية"
+  - command: service
+  - expect:
+      has_buttons: true
+  - command: explain
+  - expect:
+      has_buttons: true
+---
+name: Public user - study center and learning actions
+steps:
+  - command: edu
+  - expect:
+      buttons: ["🧪 اختباراتي", "🃏 بطاقات المراجعة", "🗓️ خطتي الدراسية", "⏱️ مؤقت التركيز"]
+  - click: "💡 السؤال اليومي"
+  - expect:
+      has_buttons: true
+  - click: "2. رابطة أيونية"
+  - expect:
+      has_buttons: true
+  - click: "🔙 رجوع لمركز المذاكرة"
+  - expect:
+      has_buttons: true
+  - command: daily
+  - expect:
+      has_buttons: true
+  - click: "1. رابطة تساهمية"
+  - expect:
+      has_buttons: true
+  - command: timer
+  - expect:
+      has_buttons: true
+  - command: plan
+  - expect:
+      has_buttons: true
+  - click: "✨ إنشاء خطة مذاكرة جديدة"
+  - expect:
+      has_buttons: true
+---
+name: Public user - orders subscriptions bookings support and privacy
+steps:
+  - command: orders
+  - expect:
+      has_buttons: true
+  - command: downloads
+  - expect:
+      has_buttons: true
+  - command: subscriptions
+  - expect:
+      has_buttons: true
+  - command: bookings
+  - expect:
+      has_buttons: true
+  - command: opportunities
+  - expect:
+      has_buttons: true
+  - click: "🔍 بحث بالمطابقة"
+  - expect:
+      has_buttons: true
+  - command: groups
+  - expect:
+      has_buttons: true
+  - click: "👥 مجموعاتي"
+  - expect:
+      has_buttons: true
+  - command: support
+  - expect:
+      has_buttons: true
+  - click: "❓ الأسئلة الشائعة"
+  - expect:
+      has_buttons: true
+  - command: profile
+  - expect:
+      has_buttons: true
+  - command: notifications
+  - expect:
+      has_buttons: true
+  - command: privacy
+  - expect:
+      has_buttons: true
+  - click: "📜 سياسة الاحتفاظ بالبيانات"
+  - expect:
+      has_buttons: true
+  - command: language
+  - expect:
+      has_buttons: true
+  - command: id
+  - expect:
+      has_buttons: true
+  - command: cancel
+  - expect:
+      has_buttons: true

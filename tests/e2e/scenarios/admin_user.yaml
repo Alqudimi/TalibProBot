@@ -1,0 +1,40 @@
+# Run only with a dedicated Telegram test user whose numeric ID is configured
+# in ADMIN_TELEGRAM_IDS and a dedicated test bot.
+name: Admin user - all admin sections and authorization
+steps:
+  - command: admin
+  - expect:
+      buttons: ["📚 الكتالوج والنشر", "🗂️ الطلبات والتنفيذ", "💳 المالية والاسترداد", "🎧 التذاكر والدعم"]
+  - click: "📚 الكتالوج والنشر"
+  - expect:
+      has_buttons: true
+  - command: admin_catalog
+  - expect:
+      has_buttons: true
+  - command: admin_orders
+  - expect:
+      has_buttons: true
+  - command: admin_finance
+  - expect:
+      has_buttons: true
+  - command: admin_support
+  - expect:
+      has_buttons: true
+  - command: admin_users
+  - expect:
+      has_buttons: true
+  - command: admin_broadcast
+  - expect:
+      has_buttons: true
+  - command: admin_disputes
+  - expect:
+      has_buttons: true
+  - command: admin_health
+  - expect:
+      has_buttons: true
+  - command: admin_audit
+  - expect:
+      has_buttons: true
+  - command: menu
+  - expect:
+      has_buttons: true

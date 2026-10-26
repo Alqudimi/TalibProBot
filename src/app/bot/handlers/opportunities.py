@@ -72,7 +72,16 @@ async def cb_opportunities_find(callback: CallbackQuery, session: AsyncSession):
 async def cb_save_opportunity(callback: CallbackQuery, current_user: User, session: AsyncSession):
     opp_id_str = callback.data.split(":")[2]
     import uuid
-    opp_id = uuid.UUID(opp_id_str)
+    try:
+        opp_id = uuid.UUID(opp_id_str)
+    except ValueError:
+        await callback.answer("معرّف الفرصة غير صالح.", show_alert=True)
+        return
+
+    opportunity = (await session.execute(select(Opportunity.id).where(Opportunity.id == opp_id))).scalar_one_or_none()
+    if opportunity is None:
+        await callback.answer("هذه الفرصة لم تعد متاحة أو غير موجودة.", show_alert=True)
+        return
 
     stmt = select(SavedOpportunity).where(
         SavedOpportunity.user_id == current_user.user_id,

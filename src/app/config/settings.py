@@ -1,25 +1,19 @@
-from typing import List, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Application Environment
     APP_ENV: str = Field(default="development")
     LOG_LEVEL: str = Field(default="INFO")
 
-    # Telegram Bot
     BOT_TOKEN: str = Field(default="0000000000:AAFakeTokenForDevelopmentAndTesting000")
     BOT_USERNAME: str = Field(default="AcademicPlatformBot")
-    ADMIN_TELEGRAM_IDS: Union[List[int], str] = Field(default_factory=lambda: [123456789])
+    TELEGRAM_API_URL: str = Field(default="")
+    BOT_API_POOL_LIMIT: int = Field(default=500, ge=10, le=2000)
+    ADMIN_TELEGRAM_IDS: list[int] | str = Field(default_factory=lambda: [123456789])
 
-    # Database Configuration
     POSTGRES_HOST: str = Field(default="localhost")
     POSTGRES_PORT: int = Field(default=5434)
     POSTGRES_USER: str = Field(default="postgres")
@@ -28,20 +22,26 @@ class Settings(BaseSettings):
     POSTGRES_SCHEMA: str = Field(default="student_platform")
     POSTGRES_SSLMODE: str = Field(default="disable")
     DATABASE_URL: str = Field(default="postgresql+asyncpg://postgres@localhost:5434/academic")
+    DB_POOL_SIZE: int = Field(default=30, ge=1, le=80)
+    DB_MAX_OVERFLOW: int = Field(default=40, ge=0, le=80)
+    DB_POOL_TIMEOUT: float = Field(default=15.0, gt=0, le=120)
+    DB_POOL_RECYCLE: int = Field(default=1800, ge=60, le=86400)
+    DB_POOL_PRE_PING: bool = Field(default=False)
 
-    # Redis (Optional)
     REDIS_ENABLED: bool = Field(default=False)
     REDIS_HOST: str = Field(default="localhost")
     REDIS_PORT: int = Field(default=6379)
     REDIS_PASSWORD: str = Field(default="")
+    CELERY_BROKER_DB: int = Field(default=0, ge=0, le=15)
+    CELERY_RESULT_DB: int = Field(default=1, ge=0, le=15)
+    CELERY_TASK_ALWAYS_EAGER: bool = Field(default=False)
 
-    # Task Worker & Background Processing
     TASK_WORKER_ENABLED: bool = Field(default=True)
     TASK_WORKER_POLL_INTERVAL: float = Field(default=2.0)
 
     @field_validator("ADMIN_TELEGRAM_IDS", mode="before")
     @classmethod
-    def parse_admin_ids(cls, v: Union[str, List[int], int]) -> List[int]:
+    def parse_admin_ids(cls, v: str | list[int] | int) -> list[int]:
         if isinstance(v, list):
             return [int(x) for x in v]
         if isinstance(v, int):
@@ -54,7 +54,6 @@ class Settings(BaseSettings):
         return []
 
     def get_asyncpg_database_url(self) -> str:
-        """Returns the formatted asyncpg database URL."""
         if self.DATABASE_URL and self.DATABASE_URL.startswith("postgresql+asyncpg://"):
             return self.DATABASE_URL
         password_part = f":{self.POSTGRES_PASSWORD}" if self.POSTGRES_PASSWORD else ""

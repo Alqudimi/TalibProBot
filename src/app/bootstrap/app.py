@@ -1,7 +1,13 @@
 import asyncio
+import json
+from typing import Any, cast
+from aiohttp import ClientError
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
+from aiogram.exceptions import TelegramNetworkError
+from aiogram.methods.base import TelegramType
 from aiogram.enums import ParseMode
 from aiogram.types import BotCommand, ErrorEvent
 from src.app.bot.handlers import (
@@ -32,11 +38,54 @@ from src.app.observability.logging import get_logger, setup_logging
 logger = get_logger("bootstrap")
 
 
+class JsonAiohttpSession(AiohttpSession):
+    """JSON Bot API transport used by Telegym's mock server in tests."""
+
+    async def make_request(self, bot: Bot, method: Any, timeout: int | None = None) -> TelegramType:
+        session = await self.create_session()
+        url = self.api.api_url(token=bot.token, method=method.__api_method__)
+        payload = method.model_dump(
+            mode="json", exclude_none=True, exclude_defaults=True
+        )
+        try:
+            async with session.post(
+                url,
+                json=payload,
+                timeout=self.timeout if timeout is None else timeout,
+            ) as resp:
+                raw_result = await resp.text()
+        except asyncio.TimeoutError as e:
+            raise TelegramNetworkError(method=method, message="Request timeout error") from e
+        except ClientError as e:
+            raise TelegramNetworkError(method=method, message=f"{type(e).__name__}: {e}") from e
+        # Telegym v0.4 stores reply keyboards but its response model only
+        # accepts inline keyboards. Omit that unsupported field for aiogram's
+        # response validation; the mock still records the original message.
+        if '"keyboard"' in raw_result and '"inline_keyboard"' not in raw_result:
+            decoded = json.loads(raw_result)
+            if isinstance(decoded.get("result"), dict):
+                decoded["result"].pop("reply_markup", None)
+                raw_result = json.dumps(decoded)
+        response = self.check_response(
+            bot=bot,
+            method=method,
+            status_code=resp.status,
+            content=raw_result,
+        )
+        return cast(TelegramType, response.result)
+
+
 class Application:
     """Encapsulates the lifecycle, services, bot instance, and dispatcher."""
 
     def __init__(self) -> None:
-        session = AiohttpSession(timeout=60.0)
+        session_kwargs = {"timeout": 60.0}
+        if settings.TELEGRAM_API_URL:
+            session_kwargs["api"] = TelegramAPIServer.from_base(
+                settings.TELEGRAM_API_URL.rstrip("/")
+            )
+        session_class = JsonAiohttpSession if settings.TELEGRAM_API_URL else AiohttpSession
+        session = session_class(limit=settings.BOT_API_POOL_LIMIT, **session_kwargs)
         self.bot = Bot(
             token=settings.BOT_TOKEN,
             session=session,

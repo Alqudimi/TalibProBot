@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+
 from src.app.config.settings import settings
 from src.app.observability.logging import get_logger
 
@@ -37,10 +39,12 @@ def get_engine() -> AsyncEngine:
         _engine = create_async_engine(
             db_url,
             echo=(settings.LOG_LEVEL.upper() == "DEBUG"),
-            pool_size=10,
-            max_overflow=20,
-            pool_timeout=30.0,
-            pool_recycle=1800,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_timeout=settings.DB_POOL_TIMEOUT,
+            pool_recycle=settings.DB_POOL_RECYCLE,
+            pool_pre_ping=settings.DB_POOL_PRE_PING,
+            pool_use_lifo=True,
             connect_args=connect_args,
         )
     return _engine
@@ -80,7 +84,7 @@ async def check_db_health() -> bool:
             result = await conn.execute(text("SELECT 1;"))
             val = result.scalar()
             return val == 1
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - health check must never crash startup
         logger.error(f"Database health check failed: {e}")
         return False
 

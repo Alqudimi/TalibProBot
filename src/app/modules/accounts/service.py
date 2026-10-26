@@ -1,8 +1,11 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
-from sqlalchemy import select, update
+from datetime import UTC, datetime
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from src.app.config.settings import settings
 from src.app.modules.accounts.models import (
     ConsentDocument,
     ExternalIdentity,
@@ -13,6 +16,7 @@ from src.app.modules.accounts.models import (
 from src.app.observability.logging import get_logger
 
 logger = get_logger("accounts")
+_terms_document_cache: tuple[uuid.UUID, str] | None = None
 
 
 class AccountService:
@@ -22,13 +26,14 @@ class AccountService:
     async def get_or_create_telegram_user(
         session: AsyncSession,
         telegram_id: int,
-        username: Optional[str] = None,
-        display_name: Optional[str] = None,
-        language_code: Optional[str] = "ar",
+        username: str | None = None,
+        display_name: str | None = None,
+        language_code: str | None = "ar",
     ) -> User:
         """Finds existing user by telegram_id or creates a new user and identity atomically."""
         stmt = (
             select(User)
+            .options(selectinload(User.learning_profile))
             .join(ExternalIdentity, User.user_id == ExternalIdentity.user_id)
             .where(
                 ExternalIdentity.provider == "telegram",
@@ -39,22 +44,31 @@ class AccountService:
         user = result.scalar_one_or_none()
 
         if user:
-            # Update last_seen_at and username if changed
-            user.last_seen_at = datetime.now(timezone.utc)
+            # Keep a bounded activity heartbeat instead of updating this hot
+            # row and committing on every Telegram update.
+            now = datetime.now(UTC)
+            if user.last_seen_at is None or (now - user.last_seen_at).total_seconds() >= 60:
+                if settings.REDIS_ENABLED and settings.TASK_WORKER_ENABLED:
+                    from src.app.infrastructure.tasks.tasks import (
+                        persist_user_heartbeat,
+                    )
+
+                    persist_user_heartbeat.delay(str(user.user_id))
+                else:
+                    user.last_seen_at = now
             if display_name and not user.display_name:
                 user.display_name = display_name[:200]
-            logger.info(f"Existing user retrieved: {user.user_id} (telegram_id={telegram_id})")
+            logger.debug(f"Existing user retrieved: {user.user_id} (telegram_id={telegram_id})")
             return user
 
         # Create new user
         new_user = User(
             user_id=uuid.uuid4(),
             display_name=(display_name or f"User {telegram_id}")[:200],
-            preferred_language="ar" if language_code and language_code.startswith("ar") else "ar",
-            last_seen_at=datetime.now(timezone.utc),
+            preferred_language="ar",
+            last_seen_at=datetime.now(UTC),
         )
         session.add(new_user)
-        await session.flush()
 
         # Link external identity
         identity = ExternalIdentity(
@@ -77,25 +91,45 @@ class AccountService:
             preferences={"interests": []},
         )
         session.add(profile)
+        # Keep the relationship populated for the current request. The new
+        # object has not been round-tripped through selectinload yet, and a
+        # synchronous attribute access in a handler must never trigger async
+        # lazy IO (MissingGreenlet).
+        new_user.learning_profile = profile
 
         # Record initial implicit terms consent
-        stmt_doc = (
-            select(ConsentDocument)
-            .where(ConsentDocument.consent_type == "terms_of_service", ConsentDocument.retired_at.is_(None))
-            .order_by(ConsentDocument.effective_at.desc())
-        )
-        doc_res = await session.execute(stmt_doc)
-        doc = doc_res.scalars().first()
+        global _terms_document_cache
+        doc: ConsentDocument | None = None
+        if _terms_document_cache is not None:
+            doc_id, doc_version = _terms_document_cache
+            doc = ConsentDocument(
+                id=doc_id,
+                consent_type="terms_of_service",
+                version=doc_version,
+                title="شروط الاستخدام العامة للمنصة",
+            )
+        else:
+            stmt_doc = (
+                select(ConsentDocument)
+                .where(ConsentDocument.consent_type == "terms_of_service", ConsentDocument.retired_at.is_(None))
+                .order_by(ConsentDocument.effective_at.desc())
+                .limit(1)
+            )
+            doc_res = await session.execute(stmt_doc)
+            doc = doc_res.scalars().first()
+            if doc:
+                _terms_document_cache = (doc.id, doc.version)
         if not doc:
             doc = ConsentDocument(
                 id=uuid.uuid4(),
                 consent_type="terms_of_service",
                 version="1.0",
                 title="شروط الاستخدام العامة للمنصة",
-                effective_at=datetime.now(timezone.utc),
+                effective_at=datetime.now(UTC),
             )
             session.add(doc)
             await session.flush()
+            _terms_document_cache = (doc.id, doc.version)
 
         consent = UserConsent(
             id=uuid.uuid4(),
@@ -106,12 +140,11 @@ class AccountService:
         )
         session.add(consent)
 
-        await session.flush()
-        logger.info(f"Created new user {new_user.user_id} for telegram_id={telegram_id}")
+        logger.debug(f"Created new user {new_user.user_id} for telegram_id={telegram_id}")
         return new_user
 
     @staticmethod
-    async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> Optional[User]:
+    async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> User | None:
         stmt = (
             select(User)
             .join(ExternalIdentity, User.user_id == ExternalIdentity.user_id)
@@ -129,8 +162,8 @@ class AccountService:
         user_id: uuid.UUID,
         consent_document_id: uuid.UUID,
         decision: str = "granted",
-        context: Optional[dict] = None,
-        action: Optional[str] = None,
+        context: dict | None = None,
+        action: str | None = None,
     ) -> UserConsent:
         dec = decision if decision in ("granted", "withdrawn") else ("granted" if action == "agree" else "withdrawn")
         consent = UserConsent(
@@ -148,10 +181,10 @@ class AccountService:
     async def upsert_learning_profile(
         session: AsyncSession,
         user_id: uuid.UUID,
-        university: Optional[str] = None,
-        major: Optional[str] = None,
-        education_level_id: Optional[int] = None,
-        goals: Optional[str] = None,
+        university: str | None = None,
+        major: str | None = None,
+        education_level_id: int | None = None,
+        goals: str | None = None,
     ) -> UserLearningProfile:
         stmt = select(UserLearningProfile).where(UserLearningProfile.user_id == user_id)
         res = await session.execute(stmt)

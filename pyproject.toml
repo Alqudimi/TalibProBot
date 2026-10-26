@@ -18,6 +18,8 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "cryptography>=43.0.0",
     "aiosqlite>=0.20.0",
+    "celery[redis]>=5.4,<6",
+    "uvloop>=0.21,<1",
 ]
 
 [dependency-groups]
@@ -36,9 +38,9 @@ dev = [
     "redis>=5.2.0",
     "ruff>=0.8.0",
     "sqlalchemy[asyncio]>=2.0.35",
+    "teremok==0.2.0",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
-

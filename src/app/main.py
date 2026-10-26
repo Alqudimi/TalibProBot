@@ -1,6 +1,6 @@
 import asyncio
 import signal
-import sys
+
 from src.app.bootstrap.app import Application
 from src.app.config.settings import settings
 from src.app.observability.logging import get_logger
@@ -37,8 +37,10 @@ async def main() -> None:
                 break
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error(f"Bot polling encountered error: {e}. Reconnecting in 5s...")
+            except Exception as e:  # noqa: BLE001 - polling must reconnect on any transport failure
+                logger.error(
+                    f"Bot polling encountered error: {e}. Reconnecting in 5s..."
+                )
                 if stop_event.is_set():
                     break
                 await asyncio.sleep(5)
@@ -54,7 +56,7 @@ async def main() -> None:
 
     try:
         # Wait until stop event or until one of the main tasks fails
-        done, pending = await asyncio.wait(
+        _done, _pending = await asyncio.wait(
             [asyncio.create_task(stop_event.wait()), *tasks],
             return_when=asyncio.FIRST_COMPLETED,
         )
@@ -68,6 +70,11 @@ async def main() -> None:
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        try:
+            import uvloop
+        except ImportError:
+            asyncio.run(main())
+        else:
+            uvloop.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Application exited.")
