@@ -51,6 +51,17 @@ class AccessControlService:
         if not role:
             raise ValueError(f"Role '{role_code}' does not exist.")
 
+        existing_stmt = select(UserRoleAssignment).where(
+            UserRoleAssignment.user_id == user_id,
+            UserRoleAssignment.role_id == role.id,
+        )
+        existing = (await session.execute(existing_stmt)).scalar_one_or_none()
+        if existing:
+            existing.assigned_by = assigned_by
+            existing.expires_at = expires_at
+            await session.flush()
+            return existing
+
         assignment = UserRoleAssignment(
             user_id=user_id,
             role_id=role.id,

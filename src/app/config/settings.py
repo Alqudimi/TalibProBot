@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     TASK_WORKER_ENABLED: bool = Field(default=True)
     TASK_WORKER_POLL_INTERVAL: float = Field(default=2.0)
+    BOT_POLLING_ENABLED: bool = Field(default=True)
 
     @field_validator("ADMIN_TELEGRAM_IDS", mode="before")
     @classmethod
@@ -61,6 +62,19 @@ class Settings(BaseSettings):
             f"postgresql+asyncpg://{self.POSTGRES_USER}{password_part}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
+
+    def validate_for_production(self) -> None:
+        """Reject unsafe defaults before a production process starts."""
+        if self.APP_ENV.lower() not in {"production", "prod"}:
+            return
+        if not self.BOT_TOKEN or self.BOT_TOKEN.startswith(("0000000000:", "your_", "test_")):
+            raise ValueError("BOT_TOKEN must be a real Telegram bot token in production")
+        if not self.DATABASE_URL.startswith("postgresql+asyncpg://"):
+            raise ValueError("DATABASE_URL must be a PostgreSQL asyncpg URL in production")
+        if self.POSTGRES_SSLMODE == "disable":
+            raise ValueError("POSTGRES_SSLMODE must not be disable in production")
+        if not self.DB_POOL_PRE_PING:
+            raise ValueError("DB_POOL_PRE_PING must be enabled in production")
 
 
 settings = Settings()

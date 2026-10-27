@@ -99,9 +99,17 @@ async def cb_entitlement_status(callback: CallbackQuery, current_user: User, ses
 
 
 @router.callback_query(F.data.startswith("sub:cancel:"))
-async def cb_sub_cancel_prompt(callback: CallbackQuery, session: AsyncSession):
-    sub_id = uuid.UUID(callback.data.split(":")[2])
-    stmt = select(Subscription).where(Subscription.id == sub_id)
+async def cb_sub_cancel_prompt(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    try:
+        sub_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("معرّف الاشتراك غير صالح.", show_alert=True)
+        return
+    stmt = select(Subscription).where(
+        Subscription.id == sub_id,
+        Subscription.user_id == current_user.user_id,
+        Subscription.status == "active",
+    )
     sub = (await session.execute(stmt)).scalar_one_or_none()
     if not sub:
         await callback.answer()
@@ -126,18 +134,56 @@ async def cb_sub_cancel_prompt(callback: CallbackQuery, session: AsyncSession):
 
 
 @router.callback_query(F.data.startswith("sub:confirm_cancel:"))
-async def cb_sub_cancel_execute(callback: CallbackQuery, session: AsyncSession):
-    sub_id = uuid.UUID(callback.data.split(":")[2])
-    stmt = select(Subscription).where(Subscription.id == sub_id)
+async def cb_sub_cancel_execute(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    try:
+        sub_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("معرّف الاشتراك غير صالح.", show_alert=True)
+        return
+    stmt = select(Subscription).where(
+        Subscription.id == sub_id,
+        Subscription.user_id == current_user.user_id,
+        Subscription.status == "active",
+    )
     sub = (await session.execute(stmt)).scalar_one_or_none()
-    if sub:
-        sub.status = "cancelled"
-        sub.cancelled_at = datetime.now(timezone.utc)
-        await session.commit()
+    if not sub:
+        await callback.answer("الاشتراك غير موجود أو لا تملك صلاحية تعديله.", show_alert=True)
+        return
+    sub.status = "cancelled"
+    sub.cancelled_at = datetime.now(timezone.utc)
+    await session.commit()
 
     await callback.message.edit_text(
         f"تم إلغاء الاشتراك #{str(sub_id)[:8].upper()} بنجاح.\n"
-        "لن يتم تجديد الاشتراك وسيتوقف الوصول بنهاية الفترة الحالية.",
-        reply_markup=main_menu_keyboard(),
+        "لن يتم تجديد الاشتراك وسيتوقف الوصول بنهاية الفترة الحالية.\n\n"
+        "يمكنك التراجع عن الإلغاء قبل انتهاء الفترة الحالية.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="تراجع عن الإلغاء", callback_data=f"sub:undo_cancel:{sub_id}")
+        ], [InlineKeyboardButton(text="الرئيسية", callback_data="home:menu")]]),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("sub:undo_cancel:"))
+async def cb_sub_undo_cancel(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    try:
+        sub_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("معرّف الاشتراك غير صالح.", show_alert=True)
+        return
+    sub = (await session.execute(select(Subscription).where(
+        Subscription.id == sub_id,
+        Subscription.user_id == current_user.user_id,
+        Subscription.status == "cancelled",
+    ))).scalar_one_or_none()
+    if not sub or (sub.current_period_end and sub.current_period_end <= datetime.now(timezone.utc)):
+        await callback.answer("انتهت فترة التراجع أو لم يعد الاشتراك متاحاً.", show_alert=True)
+        return
+    sub.status = "active"
+    sub.cancelled_at = None
+    await session.commit()
+    await callback.message.edit_text(
+        f"تمت إعادة تفعيل الاشتراك #{str(sub_id)[:8].upper()}، وسيستمر الوصول حتى نهاية الفترة.",
+        reply_markup=main_menu_keyboard(),
+    )
+    await callback.answer("تم التراجع عن الإلغاء.")

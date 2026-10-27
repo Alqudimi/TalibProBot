@@ -119,12 +119,18 @@ async def cb_view_saved_opps(callback: CallbackQuery, current_user: User, sessio
 
 
 @router.callback_query(F.data == "opp:calendar")
-async def cb_opportunities_calendar(callback: CallbackQuery):
-    text = (
-        "📅 <b>تقويم المواعيد النهائية للمنح:</b>\n\n"
-        "• <b>منح الماجستير الخريفية:</b> تنتهي غالبية التقديمات بين 15 نوفمبر و 15 يناير.\n"
-        "• <b>التدريب التعاوني الصيفي:</b> يفتح باب التقديم بين فبراير وأبريل.\n"
-        "• <b>الاختبارات المعيارية (IELTS / GRE):</b> متاحة طوال العام بمواعيد شهرية مجدولة."
-    )
+async def cb_opportunities_calendar(callback: CallbackQuery, session: AsyncSession):
+    opportunities = (await session.execute(
+        select(Opportunity)
+        .where(Opportunity.status.in_(["published", "active"]), Opportunity.deadline_at.is_not(None))
+        .order_by(Opportunity.deadline_at.asc()).limit(12)
+    )).scalars().all()
+    if not opportunities:
+        text = "📅 <b>تقويم المواعيد النهائية</b>\n\nلا توجد مواعيد منشورة حالياً."
+    else:
+        rows = ["📅 <b>تقويم المواعيد النهائية للفرص المنشورة:</b>\n"]
+        for item in opportunities:
+            rows.append(f"• <b>{html.escape(item.title)}</b> — {item.deadline_at:%Y-%m-%d}")
+        text = "\n".join(rows)
     await callback.message.edit_text(text, reply_markup=footer_keyboard("home:opp"), parse_mode="HTML")
     await callback.answer()

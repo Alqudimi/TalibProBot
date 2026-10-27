@@ -10,6 +10,7 @@ logger = get_logger("main")
 
 
 async def main() -> None:
+    settings.validate_for_production()
     app = Application()
     await app.startup()
 
@@ -45,7 +46,10 @@ async def main() -> None:
                     break
                 await asyncio.sleep(5)
 
-    tasks.append(asyncio.create_task(run_bot(), name="telegram_bot"))
+    if settings.BOT_POLLING_ENABLED:
+        tasks.append(asyncio.create_task(run_bot(), name="telegram_bot"))
+    else:
+        logger.info("BOT_POLLING_ENABLED=false; running worker-only process.")
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -56,10 +60,11 @@ async def main() -> None:
 
     try:
         # Wait until stop event or until one of the main tasks fails
-        _done, _pending = await asyncio.wait(
-            [asyncio.create_task(stop_event.wait()), *tasks],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
+        waiters = [asyncio.create_task(stop_event.wait()), *tasks]
+        if waiters:
+            await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+        else:
+            await stop_event.wait()
     finally:
         logger.info("Stopping all running tasks...")
         for t in tasks:

@@ -107,6 +107,7 @@ class Application:
         # Database session middleware
         self.dp.message.middleware(DatabaseSessionMiddleware())
         self.dp.callback_query.middleware(DatabaseSessionMiddleware())
+        self.dp.pre_checkout_query.middleware(DatabaseSessionMiddleware())
 
         # User registration middleware
         self.dp.message.middleware(UserRegistrationMiddleware())
@@ -190,6 +191,8 @@ class Application:
         db_healthy = await check_db_health()
         if not db_healthy:
             logger.error("Database connection failed during startup. Check database service and configuration.")
+            if settings.APP_ENV.lower() in {"production", "prod"}:
+                raise RuntimeError("Database health check failed; refusing production startup")
         else:
             logger.info("Database connection verified successfully.")
 

@@ -163,7 +163,11 @@ async def cb_service_view(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("svc:how:"))
 async def cb_service_how(callback: CallbackQuery, session: AsyncSession):
-    srv_id = uuid.UUID(callback.data.split(":")[2])
+    try:
+        srv_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer(ERROR_MESSAGES["E-02"], show_alert=True)
+        return
     details = await CatalogService.get_service_details(session, srv_id)
     if not details:
         await callback.answer()
@@ -184,7 +188,11 @@ async def cb_service_how(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("svc:inputs:"))
 async def cb_service_inputs(callback: CallbackQuery, session: AsyncSession):
-    srv_id = uuid.UUID(callback.data.split(":")[2])
+    try:
+        srv_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer(ERROR_MESSAGES["E-02"], show_alert=True)
+        return
     details = await CatalogService.get_service_details(session, srv_id)
     if not details:
         await callback.answer()
@@ -206,7 +214,11 @@ async def cb_service_inputs(callback: CallbackQuery, session: AsyncSession):
 
 @router.callback_query(F.data.startswith("svc:terms:"))
 async def cb_service_terms(callback: CallbackQuery, session: AsyncSession):
-    srv_id = uuid.UUID(callback.data.split(":")[2])
+    try:
+        srv_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer(ERROR_MESSAGES["E-02"], show_alert=True)
+        return
     text = (
         "📜 <b>الشروط وسياسة الاسترداد لهذه الخدمة:</b>\n\n"
         "• تُقدّم الخدمة لأغراض الإرشاد والتعليم والتدريب وتطوير المهارات.\n"

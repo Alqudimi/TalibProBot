@@ -1826,6 +1826,7 @@ CREATE TABLE study_groups (
     name            TEXT NOT NULL,
     description     TEXT,
     group_rules     TEXT NOT NULL,
+    invite_code     TEXT UNIQUE,
     visibility      TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','organization','listed')),
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','closed','moderated')),
     capacity        SMALLINT CHECK (capacity IS NULL OR capacity BETWEEN 2 AND 100),

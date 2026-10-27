@@ -20,6 +20,7 @@ from src.app.bot.ui.templates import (
 from src.app.modules.accounts.models import User
 from src.app.modules.catalog.service import CatalogService
 from src.app.modules.delivery.models import Delivery
+from src.app.modules.orders.models import Order, OrderItem
 from src.app.modules.orders.service import OrderService
 
 router = Router(name="orders")
@@ -106,7 +107,7 @@ async def show_user_orders(event: Message | CallbackQuery, current_user: User, s
             ref = str(o.id)[:8].upper()
             status_text = status_ar_map.get(o.status, o.status)
             date_str = o.created_at.strftime("%Y-%m-%d %H:%M")
-            service_name = o.items[0].offer_title_snapshot if o.items else "خدمة تعليمية"
+            service_name = o.items[0].product_title_snapshot if o.items else "خدمة تعليمية"
             text += f"• <b>طلب #{ref}</b> — {service_name}\n"
             text += f"  الحالة: {status_text} | المبلغ: {o.total_minor} {o.currency_code}\n"
             text += f"  التاريخ: {date_str}\n\n"
@@ -125,7 +126,12 @@ async def show_user_downloads(event: Message | CallbackQuery, current_user: User
     # Fetch available deliveries
     stmt = (
         select(Delivery)
-        .where(Delivery.status.in_(["available", "delivered", "sent"]))
+        .join(OrderItem, Delivery.order_item_id == OrderItem.id)
+        .join(Order, OrderItem.order_id == Order.id)
+        .where(
+            Order.user_id == current_user.user_id,
+            Delivery.status.in_(["available", "delivered", "sent"]),
+        )
         .order_by(Delivery.created_at.desc())
         .limit(10)
     )

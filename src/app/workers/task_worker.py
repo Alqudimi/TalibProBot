@@ -2,12 +2,14 @@ import asyncio
 import uuid
 from typing import Any, Dict
 from aiogram import Bot
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from src.app.config.settings import settings
 from src.app.infrastructure.database.session import get_db_session
 from src.app.infrastructure.queue.outbox import process_outbox_batch, register_task_handler
 from src.app.modules.accounts.models import ExternalIdentity, User
+from src.app.modules.catalog.models import ProductOffer
 from src.app.modules.orders.models import Order
 from src.app.modules.service_requests.service import ServiceRequestService
 from src.app.modules.subscriptions.service import SubscriptionService
@@ -34,23 +36,59 @@ async def handle_order_paid(payload: Dict[str, Any], session: AsyncSession) -> N
     logger.info(f"Worker handling 'order.paid' for order {order_id} (user {user_id})")
 
     # Load order items to see if subscription offer
-    stmt = select(Order).where(Order.id == order_id)
+    stmt = (
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(Order.id == order_id, Order.user_id == user_id)
+    )
     res = await session.execute(stmt)
     order = res.scalar_one_or_none()
     if not order:
         return
 
-    # If subscription or recurring
+    # Subscription offers create subscriptions. Other offers are fulfilled by
+    # the service-request/delivery pipeline and must not receive entitlements.
     for item in order.items:
+        offer = await session.get(ProductOffer, item.offer_id)
+        if not offer or offer.offer_type != "subscription":
+            continue
+        unit = offer.billing_interval_unit
+        count = offer.billing_interval_count or 1
+        duration_days = {
+            "day": count,
+            "week": count * 7,
+            "month": count * 30,
+            "year": count * 365,
+        }.get(unit, 30)
+        entitlement_rows = await session.execute(
+            text(
+                """
+                SELECT ed.code
+                FROM student_platform.product_offer_entitlements poe
+                JOIN student_platform.entitlement_definitions ed
+                  ON ed.id = poe.entitlement_id
+                WHERE poe.offer_id = :offer_id AND ed.is_active = TRUE
+                """
+            ),
+            {"offer_id": item.offer_id},
+        )
+        entitlement_codes = [row[0] for row in entitlement_rows.fetchall()]
         await SubscriptionService.activate_subscription(
             session=session,
             user_id=user_id,
             offer_id=item.offer_id,
-            currency_code=currency,
-            price_minor=amount,
-            duration_days=30,
-            entitlement_ids=["question_bank", "study_plan"],
+            duration_days=duration_days,
+            entitlement_ids=entitlement_codes,
+            originating_order_item_id=item.id,
         )
+
+
+@register_task_handler("broadcast.send")
+async def handle_broadcast_send(payload: Dict[str, Any], session: AsyncSession) -> None:
+    """Send one consent-filtered broadcast item; outbox retries transient errors."""
+    telegram_user_id = int(payload["telegram_user_id"])
+    text_body = str(payload["text"])[:4000]
+    await get_worker_bot().send_message(chat_id=telegram_user_id, text=text_body)
 
 
 @register_task_handler("service.execute")

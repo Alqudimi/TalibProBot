@@ -26,6 +26,14 @@ class SubscriptionService:
         now = datetime.now(timezone.utc)
         period_end = now + timedelta(days=duration_days)
 
+        if originating_order_item_id:
+            existing_stmt = select(Subscription).where(
+                Subscription.originating_order_item_id == originating_order_item_id
+            )
+            existing = (await session.execute(existing_stmt)).scalar_one_or_none()
+            if existing:
+                return existing
+
         # Check existing active subscription for this offer
         stmt = (
             select(Subscription)

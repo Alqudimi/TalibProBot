@@ -16,6 +16,7 @@ from src.app.bot.ui.templates import (
 )
 from src.app.modules.academic_services.engine import AcademicServiceEngine
 from src.app.modules.academic_services.schemas import ServiceInput
+from src.app.modules.accounts.models import User
 from src.app.modules.orders.service import OrderService
 from src.app.modules.payments.service import PaymentService
 from src.app.modules.service_requests.service import AcademicIntegrityFilter, ServiceRequestService
@@ -27,7 +28,7 @@ academic_engine = AcademicServiceEngine()
 
 
 @router.callback_query(F.data.startswith("pay:go:") | F.data.startswith("pay:"))
-async def cb_send_stars_invoice(callback: CallbackQuery, session: AsyncSession):
+async def cb_send_stars_invoice(callback: CallbackQuery, current_user: User, session: AsyncSession):
     parts = callback.data.split(":")
     order_id_str = parts[-1]
     try:
@@ -39,6 +40,9 @@ async def cb_send_stars_invoice(callback: CallbackQuery, session: AsyncSession):
     order = await OrderService.get_order_by_id(session, order_id)
     if not order:
         await callback.answer(ERROR_MESSAGES["E-03"], show_alert=True)
+        return
+    if order.user_id != current_user.user_id:
+        await callback.answer(ERROR_MESSAGES["E-12"], show_alert=True)
         return
 
     if order.status != "pending_payment":
@@ -53,7 +57,7 @@ async def cb_send_stars_invoice(callback: CallbackQuery, session: AsyncSession):
     prices = [LabeledPrice(label="الخدمة الأكاديمية", amount=order.total_minor)]
     payload = f"order:{order.id}"
 
-    service_name = order.items[0].offer_title_snapshot if order.items else "الخدمة الأكاديمية"
+    service_name = order.items[0].product_title_snapshot if order.items else "الخدمة الأكاديمية"
 
     await callback.bot.send_invoice(
         chat_id=callback.from_user.id,
@@ -74,17 +78,25 @@ async def _process_free_order(callback: CallbackQuery, order, session: AsyncSess
         f"تم اعتماد الطلب المجاني #{str(order.id)[:8].upper()}.\n\n"
         "الخطوة التالية: أرسل الآن تفاصيل سؤالك أو المفهوم أو المسألة التي تود معالجتها:"
     )
-    await callback.message.edit_text(text, reply_markup=cancel_reply_keyboard())
+    await callback.message.edit_text(text, reply_markup=footer_keyboard("home:menu"))
+    await callback.message.answer("أرسل تفاصيل الطلب الآن.", reply_markup=persistent_reply_keyboard())
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("pay:free:") | F.data.startswith("confirm_free:"))
-async def cb_free_order_confirm(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+async def cb_free_order_confirm(callback: CallbackQuery, current_user: User, session: AsyncSession, state: FSMContext):
     parts = callback.data.split(":")
-    order_id = uuid.UUID(parts[-1])
+    try:
+        order_id = uuid.UUID(parts[-1])
+    except (ValueError, IndexError):
+        await callback.answer(ERROR_MESSAGES["E-02"], show_alert=True)
+        return
     order = await OrderService.get_order_by_id(session, order_id)
-    if not order:
+    if not order or order.user_id != current_user.user_id:
         await callback.answer(ERROR_MESSAGES["E-03"], show_alert=True)
+        return
+    if order.status != "pending_payment" or order.total_minor != 0:
+        await callback.answer("هذا الطلب غير مؤهل للتفعيل المجاني.", show_alert=True)
         return
 
     order.status = "paid"
@@ -95,7 +107,7 @@ async def cb_free_order_confirm(callback: CallbackQuery, session: AsyncSession, 
 
     receipt_text = PAYMENT_RECEIPT_TEMPLATE.format(
         order_ref=str(order.id)[:8].upper(),
-        service_title=order.items[0].offer_title_snapshot if order.items else "خدمة مجانية",
+        service_title=order.items[0].product_title_snapshot if order.items else "خدمة مجانية",
         amount=0,
         telegram_payment_charge_id="FREE_PROMO",
         next_step_text="بدأ تجهيز طلبك. أرسل الآن سؤالك أو الموضوع لنبدأ التنفيذ مباشرة.",
@@ -134,7 +146,7 @@ async def handle_pre_checkout_query(query: PreCheckoutQuery, session: AsyncSessi
 
 
 @router.message(F.successful_payment)
-async def handle_successful_payment(message: Message, state: FSMContext, session: AsyncSession):
+async def handle_successful_payment(message: Message, current_user: User, state: FSMContext, session: AsyncSession):
     sp = message.successful_payment
     payload = sp.invoice_payload
     order_id_str = payload.split(":")[1]
@@ -147,10 +159,12 @@ async def handle_successful_payment(message: Message, state: FSMContext, session
         provider_payment_charge_id=sp.provider_payment_charge_id,
         total_amount=sp.total_amount,
         currency=sp.currency,
+        invoice_payload=payload,
+        payer_user_id=current_user.user_id,
     )
 
     order = await OrderService.get_order_by_id(session, order_id)
-    service_title = order.items[0].offer_title_snapshot if order and order.items else "خدمة تعليمية"
+    service_title = order.items[0].product_title_snapshot if order and order.items else "خدمة تعليمية"
 
     # Strict §6.4 Payment Receipt (NO EMOJIS)
     receipt_text = PAYMENT_RECEIPT_TEMPLATE.format(
@@ -175,7 +189,7 @@ async def handle_successful_payment(message: Message, state: FSMContext, session
 
 # Handlers for Service Inputs (F4 §7.4)
 @router.message(ServiceInputFSM.wait_text)
-async def handle_service_input_text(message: Message, state: FSMContext, session: AsyncSession):
+async def handle_service_input_text(message: Message, current_user: User, state: FSMContext, session: AsyncSession):
     prompt_text = (message.text or "").strip()
     if not prompt_text:
         await message.answer("يرجى إرسال نص السؤال أو المفهوم.")
@@ -205,14 +219,25 @@ async def handle_service_input_text(message: Message, state: FSMContext, session
 
     data = await state.get_data()
     order_id_str = data.get("order_id")
-    await state.clear()
 
     order = None
     if order_id_str:
-        order = await OrderService.get_order_by_id(session, uuid.UUID(order_id_str))
+        try:
+            order = await OrderService.get_order_by_id(session, uuid.UUID(order_id_str))
+        except ValueError:
+            order = None
+
+    if not order or order.user_id != current_user.user_id or order.status != "paid":
+        await state.clear()
+        await message.answer("تعذر التحقق من الطلب المدفوع. يرجى بدء طلب جديد من الكتالوج.")
+        return
+    if not order.items or not order.items[0].service_definition_id:
+        await state.clear()
+        await message.answer("هذا الطلب لا يحتوي على خدمة قابلة للتنفيذ.")
+        return
 
     order_ref = str(order.id)[:8].upper() if order else "DIRECT"
-    service_name = order.items[0].offer_title_snapshot if order and order.items else "خدمة تعليمية"
+    service_name = order.items[0].product_title_snapshot if order and order.items else "خدمة تعليمية"
 
     # Send Acknowledgement card §6.5
     ack_text = ACKNOWLEDGEMENT_CARD_TEMPLATE.format(
@@ -222,35 +247,26 @@ async def handle_service_input_text(message: Message, state: FSMContext, session
     )
     ack_msg = await message.answer(ack_text)
 
-    # Execute service via AcademicServiceEngine
-    service_code = "001"
-    if order and order.items:
-        service_id = order.items[0].service_id
-        details = await CatalogService.get_service_details(session, service_id)
-        if details and details[0].code and details[0].code.isdigit():
-            service_code = details[0].code.zfill(3)
-
-    inp = ServiceInput(
-        service_code=service_code,
-        user_id=str(message.from_user.id),
-        content=prompt_text,
-    )
-    result = await academic_engine.execute_service(inp)
-
-    # Delivery Card §6.6
-    delivery_text = DELIVERY_CARD_TEMPLATE.format(
-        order_ref=order_ref,
-        service_title=service_name,
-        delivery_body=html.escape(result.content),
-    )
-
-    if order:
-        order.status = "completed"
+    try:
+        await ServiceRequestService.submit_request(
+            session=session,
+            order=order,
+            service_id=order.items[0].service_definition_id,
+            prompt_text=prompt_text,
+            title=service_name,
+        )
         await session.commit()
+        await state.clear()
+    except Exception as exc:
+        await session.rollback()
+        logger.error("Could not enqueue paid service request", exc_info=exc)
+        await ack_msg.delete()
+        await message.answer("تعذر تسجيل الطلب مؤقتاً. لم يتم تغيير حالة الدفع، يرجى المحاولة مرة أخرى.")
+        return
 
     await ack_msg.delete()
     await message.answer(
-        delivery_text,
+        f"تم تسجيل طلبك #{order_ref} وإرساله إلى طابور التنفيذ الآمن. "
+        "ستصلك بطاقة التسليم عند اكتمال المعالجة.",
         reply_markup=persistent_reply_keyboard(),
-        parse_mode="HTML",
     )

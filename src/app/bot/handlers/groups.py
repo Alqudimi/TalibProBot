@@ -3,6 +3,8 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.app.bot.keyboards.inline import footer_keyboard, groups_keyboard, main_menu_keyboard
 from src.app.bot.keyboards.reply import cancel_reply_keyboard, persistent_reply_keyboard
 from src.app.bot.states.fsm import GroupFSM
@@ -58,15 +60,22 @@ async def cb_join_group_prompt(callback: CallbackQuery, state: FSMContext):
 
 
 @router.message(GroupFSM.wait_code)
-async def handle_group_code(message: Message, state: FSMContext):
+async def handle_group_code(message: Message, state: FSMContext, session: AsyncSession):
     code = (message.text or "").strip().upper()
     await state.clear()
 
     if len(code) < 4:
         await message.answer("الرمز غير صالح. يرجى التأكد من الرمز وإعادة المحاولة.", reply_markup=persistent_reply_keyboard())
         return
+    exists = (await session.execute(text("""
+        SELECT 1 FROM student_platform.study_groups
+        WHERE invite_code = :code AND status = 'active'
+    """), {"code": code})).scalar_one_or_none()
+    if not exists:
+        await message.answer("رمز الدعوة غير صالح أو انتهت صلاحيته.", reply_markup=persistent_reply_keyboard())
+        return
 
-    text = (
+    message_text = (
         f"✅ <b>تم التحقق من الرمز: {html.escape(code)}</b>\n\n"
         f"{GROUP_RULES_TEXT}\n\n"
         "هل توافق على الالتزام بالقواعد والانضمام للمجموعة؟"
@@ -77,14 +86,37 @@ async def handle_group_code(message: Message, state: FSMContext):
     builder.button(text="تراجع", callback_data="home:groups")
     builder.adjust(1)
 
-    await message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await message.answer(message_text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("grp:confirm_join:"))
-async def cb_confirm_group_join(callback: CallbackQuery):
+async def cb_confirm_group_join(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    code = callback.data.split(":", 2)[2].strip().upper()
+    group = (await session.execute(text("""
+        SELECT id, name, capacity FROM student_platform.study_groups
+        WHERE invite_code = :code AND status = 'active' FOR UPDATE
+    """), {"code": code})).mappings().first()
+    if not group:
+        await callback.answer("رمز الدعوة غير صالح أو انتهت صلاحيته.", show_alert=True)
+        return
+    member_count = (await session.execute(text("""
+        SELECT count(*) FROM student_platform.study_group_members
+        WHERE group_id = :group_id AND status = 'active'
+    """), {"group_id": group["id"]})).scalar() or 0
+    if group["capacity"] is not None and member_count >= group["capacity"]:
+        await callback.answer("المجموعة مكتملة العدد.", show_alert=True)
+        return
+    await session.execute(text("""
+        INSERT INTO student_platform.study_group_members
+            (group_id, user_id, member_role, status, rules_accepted_at)
+        VALUES (:group_id, :user_id, 'member', 'active', now())
+        ON CONFLICT (group_id, user_id) DO UPDATE
+        SET status = 'active', rules_accepted_at = now()
+    """), {"group_id": group["id"], "user_id": current_user.user_id})
+    await session.commit()
     await callback.message.edit_text(
-        "🎉 <b>تم انضمامك إلى مجموعة الدراسة بنجاح!</b>\n\n"
-        "تم إرسال إشعار لمشرف المجموعة، وستصلك التحديثات والملخصات اليومية هنا.",
+        f"🎉 <b>تم انضمامك إلى مجموعة {html.escape(group['name'])} بنجاح!</b>\n\n"
+        "تم تسجيل موافقتك على القواعد وستصلك تحديثات المجموعة هنا.",
         reply_markup=main_menu_keyboard(),
         parse_mode="HTML",
     )

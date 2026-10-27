@@ -18,8 +18,10 @@ from src.app.modules.education.service import EducationService
 
 router = Router(name="profile")
 
-# In-memory preference overrides fallback
-USER_NOTIFICATION_PREFS = {}
+DEFAULT_NOTIFICATION_PREFS = {
+    "orders": True, "subs": True, "sessions": True, "study": True,
+    "daily_question": False, "opportunities": True, "marketing": False,
+}
 
 
 @router.message(Command("profile"))
@@ -107,16 +109,9 @@ async def cb_profile_save_tz(callback: CallbackQuery, current_user: User, sessio
 @router.message(Command("notifications"))
 @router.callback_query(F.data == "prof:notif")
 async def show_notifications_settings(event: Message | CallbackQuery, current_user: User):
-    user_id_str = str(current_user.user_id)
-    prefs = USER_NOTIFICATION_PREFS.get(user_id_str, {
-        "orders": True,
-        "subs": True,
-        "sessions": True,
-        "study": True,
-        "daily_question": False,
-        "opportunities": True,
-        "marketing": False,
-    })
+    prefs = dict(DEFAULT_NOTIFICATION_PREFS)
+    if current_user.learning_profile:
+        prefs.update(current_user.learning_profile.preferences.get("notifications", {}))
 
     text = (
         "🔔 <b>إعدادات الإشعارات والتنبيهات:</b>\n\n"
@@ -133,21 +128,22 @@ async def show_notifications_settings(event: Message | CallbackQuery, current_us
 
 
 @router.callback_query(F.data.startswith("notif:toggle:"))
-async def cb_toggle_notif(callback: CallbackQuery, current_user: User):
+async def cb_toggle_notif(callback: CallbackQuery, current_user: User, session: AsyncSession):
     key = callback.data.split(":")[2]
-    user_id_str = str(current_user.user_id)
-    prefs = USER_NOTIFICATION_PREFS.get(user_id_str, {
-        "orders": True,
-        "subs": True,
-        "sessions": True,
-        "study": True,
-        "daily_question": False,
-        "opportunities": True,
-        "marketing": False,
-    })
+    if key not in DEFAULT_NOTIFICATION_PREFS:
+        await callback.answer("إعداد غير معروف.", show_alert=True)
+        return
+    prefs = dict(DEFAULT_NOTIFICATION_PREFS)
+    if current_user.learning_profile:
+        prefs.update(current_user.learning_profile.preferences.get("notifications", {}))
 
     prefs[key] = not prefs.get(key, True)
-    USER_NOTIFICATION_PREFS[user_id_str] = prefs
+    if current_user.learning_profile:
+        current_user.learning_profile.preferences = {
+            **current_user.learning_profile.preferences,
+            "notifications": prefs,
+        }
+        await session.commit()
 
     await callback.message.edit_reply_markup(reply_markup=notifications_toggle_keyboard(prefs))
     await callback.answer("تم تحديث الإعداد.")

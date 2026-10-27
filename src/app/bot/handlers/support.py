@@ -87,10 +87,17 @@ async def cb_pick_ticket_topic(callback: CallbackQuery, state: FSMContext):
         "service": "سؤال أو توضيح حول خدمة معينة",
         "other": "استفسار أو اقتراح عام",
     }
+    topic_categories = {
+        "order": "delivery",
+        "finance": "billing",
+        "service": "service_quality",
+        "other": "other",
+    }
     label = topic_labels.get(topic, "استفسار")
+    category = topic_categories.get(topic, "other")
 
     await state.set_state(TicketFSM.wait_text)
-    await state.update_data(topic=topic, topic_label=label)
+    await state.update_data(topic=category, topic_label=label)
 
     await callback.message.answer(
         f"🎧 <b>فتح تذكرة جديدة: {label}</b>\n\n"

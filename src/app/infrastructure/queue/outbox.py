@@ -86,7 +86,21 @@ async def process_outbox_batch(session: AsyncSession, batch_size: int = 10, max_
         handler = _TASK_HANDLERS.get(event_type)
 
         if not handler:
-            logger.warning(f"No handler registered for task #{task_id} event_type '{event_type}'. Skipping.")
+            error = f"No handler registered for event_type '{event_type}'"
+            logger.error(f"Outbox task #{task_id} moved to dead_letter: {error}")
+            await session.execute(
+                text(
+                    """
+                    UPDATE student_platform.transactional_outbox
+                    SET status = 'dead_letter', attempt_count = attempt_count + 1,
+                        published_at = NULL, last_error_safe = :error
+                    WHERE id = :id
+                    """
+                ),
+                {"id": task_id, "error": error[:500]},
+            )
+            await session.commit()
+            processed_count += 1
             continue
 
         try:
@@ -141,4 +155,3 @@ async def process_outbox_batch(session: AsyncSession, batch_size: int = 10, max_
         await session.commit()
 
     return processed_count
-

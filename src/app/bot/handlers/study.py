@@ -69,7 +69,11 @@ async def cb_focus_timer_prompt(event: Message | CallbackQuery, current_user: Us
 
 @router.callback_query(F.data.startswith("focus_end:"))
 async def cb_end_focus_session(callback: CallbackQuery, session: AsyncSession):
-    fs_id = uuid.UUID(callback.data.split(":")[1])
+    try:
+        fs_id = uuid.UUID(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("معرّف جلسة التركيز غير صالح.", show_alert=True)
+        return
     fs = await EducationService.complete_focus_session(session, fs_id)
     minutes = fs.actual_minutes if fs else 25
 

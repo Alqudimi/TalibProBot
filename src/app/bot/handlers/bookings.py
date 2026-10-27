@@ -68,9 +68,21 @@ async def show_user_bookings(event: Message | CallbackQuery, current_user: User,
 
 
 @router.callback_query(F.data.startswith("book:cancel:"))
-async def cb_booking_cancel_prompt(callback: CallbackQuery, session: AsyncSession):
-    booking_id = uuid.UUID(callback.data.split(":")[2])
-    stmt = select(Booking).where(Booking.id == booking_id)
+async def cb_booking_cancel_prompt(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    try:
+        booking_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("معرّف الحجز غير صالح.", show_alert=True)
+        return
+    stmt = (
+        select(Booking)
+        .join(BookingParticipant, Booking.id == BookingParticipant.booking_id)
+        .where(
+            Booking.id == booking_id,
+            BookingParticipant.user_id == current_user.user_id,
+            BookingParticipant.participant_status != "cancelled",
+        )
+    )
     b = (await session.execute(stmt)).scalar_one_or_none()
     if not b:
         await callback.answer(ERROR_MESSAGES["E-02"], show_alert=True)
@@ -93,16 +105,22 @@ async def cb_booking_cancel_prompt(callback: CallbackQuery, session: AsyncSessio
 
 @router.callback_query(F.data.startswith("book:confirm_cancel:"))
 async def cb_booking_cancel_execute(callback: CallbackQuery, current_user: User, session: AsyncSession):
-    booking_id = uuid.UUID(callback.data.split(":")[2])
+    try:
+        booking_id = uuid.UUID(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("معرّف الحجز غير صالح.", show_alert=True)
+        return
     stmt = select(BookingParticipant).where(
         BookingParticipant.booking_id == booking_id,
         BookingParticipant.user_id == current_user.user_id,
     )
     bp = (await session.execute(stmt)).scalar_one_or_none()
-    if bp:
-        bp.participant_status = "cancelled"
-        bp.cancelled_at = datetime.now(timezone.utc)
-        await session.commit()
+    if not bp or bp.participant_status == "cancelled":
+        await callback.answer("الحجز غير موجود أو لا تملك صلاحية إلغاء هذا الحجز.", show_alert=True)
+        return
+    bp.participant_status = "cancelled"
+    bp.cancelled_at = datetime.now(timezone.utc)
+    await session.commit()
 
     await callback.message.edit_text(
         "تم إلغاء الموعد بنجاح وتحرير الفتحة الزمنية.",

@@ -47,6 +47,14 @@ class OrderService:
                 matched_price_id = p.id
                 break
 
+        # Absence of a price is a catalog/configuration error, not a free
+        # product. A free offer must carry an explicit zero-price record so
+        # payment callbacks cannot be used to bypass pricing configuration.
+        if matched_price_id is None:
+            raise ServiceNotFoundError(
+                f"Offer {offer_id} has no active price for currency {currency_code}."
+            )
+
         # If trial or free
         payment_required = (price_minor > 0)
 
@@ -137,4 +145,3 @@ class OrderService:
         await session.flush()
         logger.info(f"Order {order_id} cancelled by user {user_id}. Reason: {reason}")
         return order
-
