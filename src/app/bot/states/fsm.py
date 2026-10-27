@@ -87,9 +87,15 @@ class AdminUserFSM(StatesGroup):
     wait_reason = State()
 
 
+class FlashcardFSM(StatesGroup):
+    wait_deck_title = State()
+    wait_card_front = State()
+    wait_card_back = State()
+
+
 # Backward-compatibility aliases
 SearchStates = SearchFSM
 ServiceOrderStates = ServiceInputFSM
 FocusSessionStates = TimerFSM
-FlashcardStates = StatesGroup  # placeholder
+FlashcardStates = FlashcardFSM
 ProfileStates = ProfileFSM

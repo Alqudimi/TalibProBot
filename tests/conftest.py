@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 # placeholder .env. This is a syntactically valid token and is never sent to
 # Telegram because tests use mocked transports.
 os.environ.setdefault("BOT_TOKEN", "1234567890:pytest_valid_local_token")
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/academic")
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://postgres@localhost:5434/academic")
 os.environ.setdefault("POSTGRES_SCHEMA", "student_platform")
 
 from src.app.config.settings import settings

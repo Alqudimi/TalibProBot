@@ -24,6 +24,7 @@ class FileStorageService:
         asset_kind: str = "user_upload",
         sensitivity: str = "standard",
         storage_backend: str = "local",
+        metadata: Optional[dict] = None,
     ) -> StoredAsset:
         asset = StoredAsset(
             id=uuid.uuid4(),
@@ -36,6 +37,7 @@ class FileStorageService:
             asset_kind=asset_kind,
             sensitivity=sensitivity,
             storage_backend=storage_backend,
+            metadata_=metadata or {},
         )
         session.add(asset)
         await session.flush()

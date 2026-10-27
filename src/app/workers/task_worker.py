@@ -93,23 +93,49 @@ async def handle_broadcast_send(payload: Dict[str, Any], session: AsyncSession) 
 
 @register_task_handler("service.execute")
 async def handle_service_execute(payload: Dict[str, Any], session: AsyncSession) -> None:
+    import re
+    from src.app.modules.academic_services.engine import AcademicServiceEngine
+    from src.app.modules.academic_services.schemas import ServiceInput
+    from src.app.modules.catalog.models import ServiceDefinition
+    from src.app.modules.service_requests.models import ServiceRequest
+
     request_id = uuid.UUID(payload["request_id"])
     prompt = payload.get("prompt", "")
+    user_id_raw = payload.get("user_id")
 
-    logger.info(f"Worker generating educational result for request {request_id}...")
+    logger.info(f"Worker generating real academic service result for request {request_id}...")
 
-    # Build pedagogical structured explanation
+    req_stmt = select(ServiceRequest).where(ServiceRequest.id == request_id)
+    req = (await session.execute(req_stmt)).scalar_one_or_none()
+
+    service_code = "001"
+    if req:
+        service_def = await session.get(ServiceDefinition, req.service_id)
+        if service_def and service_def.code:
+            extracted = re.sub(r"\D", "", service_def.code)
+            if extracted:
+                service_code = extracted.zfill(3)
+        if not prompt and req.prompt_text:
+            prompt = req.prompt_text
+
+    engine = AcademicServiceEngine()
+    srv_input = ServiceInput(
+        service_code=service_code,
+        content=prompt or "شرح وتوجيه أكاديمي",
+        user_id=str(user_id_raw) if user_id_raw else (str(req.user_id) if req else "00000000-0000-0000-0000-000000000000"),
+    )
+    result = await engine.execute_service(srv_input)
+
     deliverable_payload = {
-        "title": "الشرح التعليمي وتفكيك خطوات الحل",
-        "concept_breakdown": f"تم تحليل المفهوم المتعلق بـ: '{prompt[:60]}'.",
-        "guided_steps": [
-            "الخطوة 1: تحديد المعطيات الأساسية والمطلوب في السؤال بدقة.",
-            "الخطوة 2: استدعاء القوانين والمفاهيم النظرية الحاكمة للمسألة.",
-            "الخطوة 3: تطبيق خطوات الحل بتسلسل منطقي.",
-            "الخطوة 4: التحقق من صحة النتيجة والوحدات المستخدمة.",
-        ],
-        "practice_question": "سؤال تدريبي مقترح للتحقق من الفهم: جرب تطبيق نفس الخطوات السابقة على حالة مشابهة.",
-        "academic_note": "هذا المحتوى مقدم لأغراض تعليمية لمساعدتك على إتقان مهارة حل المسائل بأنماطها المختلفة.",
+        "title": result.service_name or "النتيجة التعليمية",
+        "service_code": result.service_code,
+        "success": result.success,
+        "status": result.status,
+        "summary": result.summary,
+        "rendered_output": result.rendered_output,
+        "structured_data": result.structured_data,
+        "follow_up_actions": result.follow_up_actions,
+        "disclaimer": result.disclaimer,
     }
 
     await ServiceRequestService.deliver_result(

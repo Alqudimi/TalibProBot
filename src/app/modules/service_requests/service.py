@@ -121,6 +121,7 @@ class ServiceRequestService:
             media_type="application/json",
             byte_size=len(content_bytes),
             asset_kind="request_output",
+            metadata=deliverable_content,
         )
 
         delivery = Delivery(

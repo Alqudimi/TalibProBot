@@ -123,13 +123,17 @@ async def show_user_orders(event: Message | CallbackQuery, current_user: User, s
 @router.message(Command("downloads"))
 @router.callback_query(F.data == "home:downloads")
 async def show_user_downloads(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
-    # Fetch available deliveries
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from src.app.modules.service_requests.models import ServiceRequest
+
+    # Fetch available deliveries (from orders or service requests)
     stmt = (
         select(Delivery)
-        .join(OrderItem, Delivery.order_item_id == OrderItem.id)
-        .join(Order, OrderItem.order_id == Order.id)
+        .outerjoin(OrderItem, Delivery.order_item_id == OrderItem.id)
+        .outerjoin(Order, OrderItem.order_id == Order.id)
+        .outerjoin(ServiceRequest, Delivery.service_request_id == ServiceRequest.id)
         .where(
-            Order.user_id == current_user.user_id,
+            ((Order.user_id == current_user.user_id) | (ServiceRequest.user_id == current_user.user_id)),
             Delivery.status.in_(["available", "delivered", "sent"]),
         )
         .order_by(Delivery.created_at.desc())
@@ -138,24 +142,80 @@ async def show_user_downloads(event: Message | CallbackQuery, current_user: User
     res = await session.execute(stmt)
     deliveries = res.scalars().all()
 
+    builder = InlineKeyboardBuilder()
+
     if not deliveries:
         text = (
             "📥 <b>مكتبة ملفاتك وتنزيلاتك الرقمية:</b>\n\n"
             "لا توجد ملفات جاهزة للتنزيل حالياً. عند شراء أي منتج رقمي أو اكتمال تسليم طلباتك، ستظهر روابط التنزيل المباشرة هنا."
         )
+        builder.button(text="📚 تصفح الخدمات", callback_data="home:services")
+        builder.button(text="🏠 الرئيسية", callback_data="home:menu")
+        builder.adjust(1)
     else:
-        text = f"📥 <b>ملفاتك وتنزيلاتك المتاحة ({len(deliveries)} ملف):</b>\n\n"
+        text = f"📥 <b>ملفاتك وتنزيلاتك المتاحة ({len(deliveries)} تسليم):</b>\n\n"
         for d in deliveries:
             d_ref = str(d.id)[:8].upper()
-            date_str = d.created_at.strftime("%Y-%m-%d")
-            text += f"• 📄 <b>ملف #{d_ref}</b> — صالح حتى {d.expires_at.strftime('%Y-%m-%d') if d.expires_at else 'دائم'}\n"
-            text += f"  تاريخ الإتاحة: {date_str}\n\n"
+            date_str = d.created_at.strftime("%Y-%m-%d %H:%M")
+            text += f"• 📄 <b>تسليم #{d_ref}</b> — متاح منذ {date_str}\n"
+            builder.button(text=f"📖 عرض محتوى #{d_ref}", callback_data=f"deliv:view:{d.id}")
 
+        builder.button(text="🏠 الرئيسية", callback_data="home:menu")
+        builder.adjust(1)
+
+    markup = builder.as_markup()
     if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=footer_keyboard("home:my"), parse_mode="HTML")
+        await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         await event.answer()
     else:
-        await event.answer(text, reply_markup=footer_keyboard("home:my"), parse_mode="HTML")
+        await event.answer(text, reply_markup=markup, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("deliv:view:"))
+async def cb_view_delivery_content(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from src.app.modules.files.models import StoredAsset
+    from src.app.modules.service_requests.models import ServiceRequest
+
+    deliv_id_str = callback.data.split(":")[2]
+    try:
+        deliv_id = uuid.UUID(deliv_id_str)
+    except (ValueError, IndexError):
+        await callback.answer(ERROR_MESSAGES["E-02"], show_alert=True)
+        return
+
+    stmt = (
+        select(Delivery)
+        .outerjoin(OrderItem, Delivery.order_item_id == OrderItem.id)
+        .outerjoin(Order, OrderItem.order_id == Order.id)
+        .outerjoin(ServiceRequest, Delivery.service_request_id == ServiceRequest.id)
+        .where(
+            Delivery.id == deliv_id,
+            ((Order.user_id == current_user.user_id) | (ServiceRequest.user_id == current_user.user_id)),
+        )
+    )
+    delivery = (await session.execute(stmt)).scalar_one_or_none()
+    if not delivery:
+        await callback.answer(ERROR_MESSAGES["E-03"], show_alert=True)
+        return
+
+    asset = await session.get(StoredAsset, delivery.asset_id)
+    content_meta = asset.metadata_ if asset and asset.metadata_ else {}
+
+    title = content_meta.get("title", "المحتوى الأكاديمي المسلّم")
+    rendered = content_meta.get("rendered_output") or content_meta.get("summary") or "تم تسليم الطلب بنجاح."
+
+    text_msg = (
+        f"📄 <b>{html.escape(title)}</b> (#{str(delivery.id)[:8].upper()})\n\n"
+        f"{rendered[:3500]}"
+    )
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 العودة للتنزيلات", callback_data="home:downloads")
+    builder.button(text="🏠 الرئيسية", callback_data="home:menu")
+    builder.adjust(1)
+
+    await callback.message.edit_text(text_msg, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("ord:cancel:") | F.data.startswith("cancel_order:"))

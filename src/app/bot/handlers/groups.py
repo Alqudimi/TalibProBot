@@ -37,13 +37,42 @@ async def show_groups_hub(event: Message | CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data == "grp:mine")
-async def cb_user_groups(callback: CallbackQuery):
-    text = (
-        "👥 <b>مجموعاتي الدراسية النشطة:</b>\n\n"
-        "لا تنتمي حالياً إلى أي مجموعة دراسية نشطة.\n"
-        "يمكنك الانضمام إلى مجموعة باستخدام رمز الدعوة الممنوح لك من المشرف، أو طلب الانضمام لنادي المذاكرة."
-    )
-    await callback.message.edit_text(text, reply_markup=footer_keyboard("home:groups"), parse_mode="HTML")
+async def cb_user_groups(callback: CallbackQuery, current_user: User, session: AsyncSession):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    rows = (await session.execute(text("""
+        SELECT g.id, g.name, g.invite_code, m.member_role, m.joined_at,
+               (SELECT count(*) FROM student_platform.study_group_members WHERE group_id = g.id AND status = 'active') AS member_count
+        FROM student_platform.study_group_members m
+        JOIN student_platform.study_groups g ON g.id = m.group_id
+        WHERE m.user_id = :user_id AND m.status = 'active'
+        ORDER BY m.joined_at DESC
+    """), {"user_id": current_user.user_id})).mappings().all()
+
+    builder = InlineKeyboardBuilder()
+
+    if not rows:
+        text_content = (
+            "👥 <b>مجموعاتي الدراسية النشطة:</b>\n\n"
+            "لا تنتمي حالياً إلى أي مجموعة دراسية نشطة.\n"
+            "يمكنك الانضمام إلى مجموعة باستخدام رمز الدعوة الممنوح لك من المشرف، أو طلب الانضمام لنادي المذاكرة."
+        )
+        builder.button(text="🔑 الانضمام برمز دعوة", callback_data="grp:join")
+        builder.button(text="🔙 رجوع", callback_data="home:groups")
+        builder.adjust(1)
+    else:
+        text_content = f"👥 <b>مجموعاتك الدراسية النشطة ({len(rows)} مجموعة):</b>\n\n"
+        for r in rows:
+            text_content += (
+                f"• <b>{html.escape(r['name'])}</b>\n"
+                f"  دورك: {r['member_role']} | عدد الأعضاء: {r['member_count']}\n"
+                f"  رمز الدعوة: <code>{r['invite_code']}</code>\n\n"
+            )
+        builder.button(text="🔑 الانضمام لمجموعة أخرى", callback_data="grp:join")
+        builder.button(text="🔙 رجوع", callback_data="home:groups")
+        builder.adjust(1)
+
+    await callback.message.edit_text(text_content, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
 
 
