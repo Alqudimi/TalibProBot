@@ -17,6 +17,7 @@ router = Router(name="subscriptions")
 
 
 @router.message(Command("subscriptions"))
+@router.message(F.text == "اشتراكاتي")
 @router.callback_query(F.data == "home:subs")
 async def show_user_subscriptions(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
     now = datetime.now(timezone.utc)

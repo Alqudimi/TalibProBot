@@ -23,6 +23,7 @@ router = Router(name="study")
 
 
 @router.message(Command("edu"))
+@router.message(F.text == "مذاكرة")
 @router.callback_query(F.data.in_(["home:edu", "edu:hub"]))
 async def show_study_center(event: Message | CallbackQuery):
     text = (
@@ -43,6 +44,7 @@ async def show_study_center(event: Message | CallbackQuery):
 
 # 7.11.5 Focus Timer (/timer)
 @router.message(Command("timer"))
+@router.message(F.text == "مؤقت")
 @router.callback_query(F.data.in_(["edu:timer", "menu:focus"]))
 async def cb_focus_timer_prompt(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
     stats = await EducationService.get_user_focus_stats(session, current_user.user_id)
@@ -266,6 +268,7 @@ async def cb_flashcard_reveal(callback: CallbackQuery, session: AsyncSession):
 
 # 7.11.3 Study Plan (/plan)
 @router.message(Command("plan"))
+@router.message(F.text == "خطتي")
 @router.callback_query(F.data == "edu:plan")
 async def show_study_plan(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
     stmt = (
@@ -332,6 +335,7 @@ async def cb_create_plan_sample(callback: CallbackQuery, current_user: User, ses
 
 # 7.11.6 Daily Question (/daily)
 @router.message(Command("daily"))
+@router.message(F.text == "سؤاليومي")
 @router.callback_query(F.data == "edu:daily")
 async def show_daily_question(event: Message | CallbackQuery):
     text = (

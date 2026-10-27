@@ -51,6 +51,8 @@ async def cmd_service_direct(message: Message, current_user: User, session: Asyn
     service_code = parts[1].strip().zfill(3)
     content = parts[2].strip()
 
+    from sqlalchemy import or_
+
     stmt = (
         select(Order)
         .join(OrderItem, OrderItem.order_id == Order.id)
@@ -58,19 +60,52 @@ async def cmd_service_direct(message: Message, current_user: User, session: Asyn
         .where(
             Order.user_id == current_user.user_id,
             Order.status == "paid",
-            OrderItem.product_code_snapshot == service_code,
+            or_(
+                OrderItem.product_code_snapshot == service_code,
+                OrderItem.product_code_snapshot == f"svc_{service_code}",
+                OrderItem.product_code_snapshot == f"offer-svc_{service_code}",
+            ),
         )
         .order_by(Order.created_at.desc())
         .limit(1)
     )
     order = (await session.execute(stmt)).unique().scalar_one_or_none()
+
+    # If no existing paid order, check if this is a free promotional service (001, 002, 020)
+    if not order and service_code in ("001", "002", "020"):
+        from src.app.modules.catalog.models import ProductOffer
+        from src.app.modules.orders.service import OrderService
+
+        offer = (
+            await session.execute(
+                select(ProductOffer).where(ProductOffer.code == f"offer-svc_{service_code}")
+            )
+        ).scalar_one_or_none()
+        if offer:
+            order = await OrderService.create_order_from_offer(
+                session=session,
+                user_id=current_user.user_id,
+                offer_id=offer.id,
+                currency_code="XTR",
+            )
+            order.status = "paid"
+            await session.commit()
+            order = (await session.execute(stmt)).unique().scalar_one_or_none()
+
     if not order or not order.items or not order.items[0].service_definition_id:
         await message.answer(
-            "لا يمكن تنفيذ الخدمة مباشرة. يرجى اختيار الخدمة من الكتالوج وإتمام الطلب أولاً.",
+            "لا يمكن تنفيذ الخدمة مباشرة. يرجى اختيار الخدمة من الكتالوج وإتمام الطلب أولاً عبر /services.",
         )
         return
 
-    item = next((i for i in order.items if i.product_code_snapshot == service_code), order.items[0])
+    item = next(
+        (
+            i
+            for i in order.items
+            if i.product_code_snapshot in (service_code, f"svc_{service_code}", f"offer-svc_{service_code}")
+        ),
+        order.items[0],
+    )
     await ServiceRequestService.submit_request(
         session=session,
         order=order,
@@ -80,8 +115,8 @@ async def cmd_service_direct(message: Message, current_user: User, session: Asyn
     )
     await session.commit()
     await message.answer(
-        f"تم استلام طلبك المدفوع للخدمة {service_code} ووضعه في طابور التنفيذ الآمن. "
-        "ستصلك النتيجة بعد اكتمال المعالجة.",
+        f"تم استلام طلبك للخدمة {service_code} ووضعه في طابور التنفيذ الآمن. "
+        "ستصلك النتيجة بعد اكتمال المعالجة ويمكنك متابعتها عبر /orders.",
     )
 
 

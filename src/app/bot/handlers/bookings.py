@@ -16,6 +16,7 @@ router = Router(name="bookings")
 
 
 @router.message(Command("bookings"))
+@router.message(F.text == "مواعيدي")
 @router.callback_query(F.data == "home:bookings")
 async def show_user_bookings(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
     now = datetime.now(timezone.utc)

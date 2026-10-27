@@ -20,7 +20,7 @@ router = Router(name="catalog")
 
 
 @router.message(Command("services"))
-@router.message(F.text == "📚 الخدمات")
+@router.message(F.text.in_(["📚 الخدمات", "خدمات"]))
 @router.callback_query(F.data.in_(["home:services", "menu:catalog", "cat:list"]))
 async def show_catalog_categories(event: Message | CallbackQuery, session: AsyncSession, state: FSMContext):
     await state.clear()
@@ -232,6 +232,7 @@ async def cb_service_terms(callback: CallbackQuery, session: AsyncSession):
 
 # Search Flow (§7.2.5)
 @router.message(Command("search"))
+@router.message(F.text == "بحث")
 @router.callback_query(F.data.in_(["cat:search", "menu:search"]))
 async def cb_or_cmd_search(event: Message | CallbackQuery, state: FSMContext):
     await state.set_state(SearchFSM.wait_query)

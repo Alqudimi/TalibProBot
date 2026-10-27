@@ -25,6 +25,7 @@ DEFAULT_NOTIFICATION_PREFS = {
 
 
 @router.message(Command("profile"))
+@router.message(F.text == "ملفي")
 @router.callback_query(F.data.in_(["home:profile", "menu:profile"]))
 async def show_user_profile(event: Message | CallbackQuery, current_user: User, session: AsyncSession, state: FSMContext):
     await state.clear()
@@ -107,6 +108,7 @@ async def cb_profile_save_tz(callback: CallbackQuery, current_user: User, sessio
 
 
 @router.message(Command("notifications"))
+@router.message(F.text == "إشعاراتي")
 @router.callback_query(F.data == "prof:notif")
 async def show_notifications_settings(event: Message | CallbackQuery, current_user: User):
     prefs = dict(DEFAULT_NOTIFICATION_PREFS)
@@ -150,6 +152,7 @@ async def cb_toggle_notif(callback: CallbackQuery, current_user: User, session: 
 
 
 @router.message(Command("language"))
+@router.message(F.text == "لغة")
 async def cmd_language(message: Message):
     await message.answer(
         "🌐 <b>لغة الواجهة:</b>\n"

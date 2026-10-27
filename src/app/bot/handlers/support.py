@@ -30,7 +30,7 @@ FAQ_TEXT = """❓ <b>الأسئلة الشائعة حول المنصة:</b>
 
 
 @router.message(Command("support"))
-@router.message(F.text == "🎧 الدعم")
+@router.message(F.text.in_(["🎧 الدعم", "دعم"]))
 @router.callback_query(F.data == "home:support")
 async def show_support_home(event: Message | CallbackQuery, state: FSMContext):
     await state.clear()

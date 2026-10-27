@@ -2,14 +2,16 @@ import asyncio
 import json
 from typing import Any, cast
 from aiohttp import ClientError
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.exceptions import TelegramNetworkError
 from aiogram.methods.base import TelegramType
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand, ErrorEvent
+from aiogram.types import BotCommand, ErrorEvent, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from src.app.bot.ui.templates import ERROR_MESSAGES
 from src.app.bot.handlers import (
     admin,
     bookings,
@@ -132,6 +134,17 @@ class Application:
             return True
 
     def register_routers(self) -> None:
+        fallback_router = Router(name="fallback")
+
+        @fallback_router.message()
+        async def handle_unknown_message(message: Message) -> None:
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🏠 القائمة الرئيسية", callback_data="home:menu")
+            await message.answer(
+                ERROR_MESSAGES["E-10"],
+                reply_markup=builder.as_markup(),
+            )
+
         self.dp.include_routers(
             start.router,
             catalog.router,
@@ -148,6 +161,7 @@ class Application:
             study.router,
             provider.router,
             admin.router,
+            fallback_router,
         )
 
     async def setup_bot_commands(self) -> None:

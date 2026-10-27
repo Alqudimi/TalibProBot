@@ -70,7 +70,7 @@ async def cb_create_order_review(callback: CallbackQuery, current_user: User, se
 
 
 @router.message(Command("orders"))
-@router.message(F.text == "🗂️ طلباتي")
+@router.message(F.text.in_(["🗂️ طلباتي", "طلباتي"]))
 @router.callback_query(F.data.in_(["home:my", "menu:orders", "ord:tab:active", "ord:tab:completed", "ord:tab:cancelled"]))
 async def show_user_orders(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
     tab = "active"
@@ -121,6 +121,7 @@ async def show_user_orders(event: Message | CallbackQuery, current_user: User, s
 
 
 @router.message(Command("downloads"))
+@router.message(F.text.in_(["ملفاتي", "ملفاتي المشتراة"]))
 @router.callback_query(F.data == "home:downloads")
 async def show_user_downloads(event: Message | CallbackQuery, current_user: User, session: AsyncSession):
     from aiogram.utils.keyboard import InlineKeyboardBuilder

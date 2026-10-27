@@ -21,6 +21,7 @@ GROUP_RULES_TEXT = """👥 <b>ميثاق وقواعد مجموعات الدرا�
 
 
 @router.message(Command("groups"))
+@router.message(F.text == "مجموعات")
 @router.callback_query(F.data.in_(["home:groups", "edu:groups"]))
 async def show_groups_hub(event: Message | CallbackQuery, state: FSMContext):
     await state.clear()

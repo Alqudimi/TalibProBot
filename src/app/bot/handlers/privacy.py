@@ -22,6 +22,7 @@ RETENTION_POLICY_TEXT = """📜 <b>سياسة الاحتفاظ بالبيانا�
 
 
 @router.message(Command("privacy"))
+@router.message(F.text == "خصوصيتي")
 @router.callback_query(F.data.in_(["home:privacy", "priv:home"]))
 async def show_privacy_home(event: Message | CallbackQuery):
     text = (

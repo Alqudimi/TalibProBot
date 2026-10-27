@@ -13,6 +13,7 @@ router = Router(name="opportunities")
 
 
 @router.message(Command("opportunities"))
+@router.message(F.text == "فرص")
 @router.callback_query(F.data.in_(["home:opp", "opp:hub"]))
 async def show_opportunities_hub(event: Message | CallbackQuery):
     text = (

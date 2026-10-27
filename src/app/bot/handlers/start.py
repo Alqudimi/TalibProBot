@@ -167,7 +167,7 @@ async def cb_onboard_tz(callback: CallbackQuery, current_user: User, session: As
 
 
 @router.message(Command("menu"))
-@router.message(F.text == "🏠 الرئيسية")
+@router.message(F.text.in_(["🏠 الرئيسية", "القائمة"]))
 async def cmd_menu(message: Message, current_user: User, session: AsyncSession, state: FSMContext):
     await state.clear()
     first_name = html.escape(message.from_user.first_name or "")
@@ -193,6 +193,7 @@ async def cb_home_menu(callback: CallbackQuery, current_user: User, session: Asy
 
 
 @router.message(Command("help"))
+@router.message(F.text == "مساعدة")
 async def cmd_help(message: Message):
     await message.answer(
         HELP_TEXT,
@@ -202,6 +203,7 @@ async def cmd_help(message: Message):
 
 
 @router.message(Command("terms"))
+@router.message(F.text == "الشروط")
 @router.callback_query(F.data == "terms:read")
 async def cmd_or_cb_terms(event: Message | CallbackQuery):
     if isinstance(event, CallbackQuery):
@@ -222,7 +224,7 @@ async def cmd_id(message: Message, current_user: User):
 
 
 @router.message(Command("cancel"))
-@router.message(F.text == "✖️ إلغاء")
+@router.message(F.text.in_(["✖️ إلغاء", "إلغاء"]))
 async def cmd_cancel(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state:
