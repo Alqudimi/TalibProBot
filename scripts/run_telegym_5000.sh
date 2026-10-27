@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-TELEGYM_ROOT="/home/ubuntu/telegym"
+TELEGYM_ROOT="${TELEGYM_ROOT:-$HOME/telegym}"
 TOKEN="${TELEGYM_BOT_TOKEN:-1234567890:telegym_test_token_xxxxxxxx}"
 export BOT_TOKEN="$TOKEN"
 export TELEGRAM_API_URL="${TELEGRAM_API_URL:-http://127.0.0.1:5678}"
-export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://postgres:talib_test_password@localhost:5432/academic}"
+export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://postgres@localhost:5434/academic}"
 export POSTGRES_SCHEMA="${POSTGRES_SCHEMA:-student_platform}"
 export TELEGYM_MOCK_DEFAULT_WEBHOOK="http://127.0.0.1:8089/telegym/update"
 export TELEGYM_MOCK_URL="http://127.0.0.1:5678"

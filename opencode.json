@@ -1,6 +1,4 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
-  "experimental": {
-    "subagent_depth": 2
-  }
+
 }

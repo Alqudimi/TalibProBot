@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ROOT="/home/ubuntu/telegym"
+ROOT="${TELEGYM_ROOT:-$HOME/telegym}"
 MOCK="$ROOT/bin/telegym-mock"
 K6="$ROOT/bin/k6"
-[[ -x "$MOCK" ]] || { echo "Missing $MOCK" >&2; exit 1; }
+[[ -x "$MOCK" ]] || { echo "Missing $MOCK; build with: cd $ROOT && PATH=/usr/local/go/bin:\$PATH make build" >&2; exit 1; }
 [[ -x "$K6" ]] || { echo "Missing $K6; build with: cd $ROOT && PATH=/usr/local/go/bin:\$PATH make k6" >&2; exit 1; }
 export BOT_TOKEN="${BOT_TOKEN:-1234567890:telegym_test_token_xxxxxxxx}"
 export TELEGRAM_API_URL="${TELEGRAM_API_URL:-http://127.0.0.1:5678}"
-export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://postgres:talib_test_password@localhost:5432/academic}"
+export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://postgres@localhost:5434/academic}"
 export POSTGRES_SCHEMA="${POSTGRES_SCHEMA:-student_platform}"
 export TELEGYM_MOCK_DEFAULT_WEBHOOK="http://127.0.0.1:8089/telegym/update"
 export TELEGRAM_API_URL
