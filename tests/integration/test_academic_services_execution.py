@@ -354,3 +354,27 @@ async def test_group_10_wellness_and_accessibility_services():
     ))
     assert res_153.success is True
     assert "مجموعة دعم الأقران والمجتمع الطلابي الآمن" in res_153.rendered_output
+
+
+@pytest.mark.asyncio
+async def test_all_153_services_exhaustive_execution():
+    """Exhaustive automated verification that all 153 academic services execute properly."""
+    engine = AcademicServiceEngine()
+    assert len(engine._processors) == 153
+
+    for i in range(1, 154):
+        code_str = f"{i:03d}"
+        assert code_str in engine._processors, f"Processor {code_str} not registered in engine."
+
+        inp = ServiceInput(
+            service_code=code_str,
+            user_id="11111111-1111-1111-1111-111111111111",
+            content="موضوع دراسي تجريبي للاختبار والتحقق الشامل",
+            parameters={"level": "جامعي", "depth": "متقدم"}
+        )
+        res = await engine.execute_service(inp)
+        assert res.success is True, f"Service {code_str} execution failed: {res.summary}"
+        assert res.status in ("completed", "scheduled", "delivered", "active", "confirmed"), f"Service {code_str} status invalid: {res.status}"
+        assert res.rendered_output and len(res.rendered_output) > 20, f"Service {code_str} rendered output is empty or truncated."
+        assert res.service_name and len(res.service_name) > 0, f"Service {code_str} service_name missing."
+
