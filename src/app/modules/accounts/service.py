@@ -15,8 +15,11 @@ from src.app.modules.accounts.models import (
 )
 from src.app.observability.logging import get_logger
 
+import time
+
 logger = get_logger("accounts")
 _terms_document_cache: tuple[uuid.UUID, str] | None = None
+_telegram_user_id_cache: dict[int, tuple[uuid.UUID, float]] = {}
 
 
 class AccountService:
@@ -31,21 +34,29 @@ class AccountService:
         language_code: str | None = "ar",
     ) -> User:
         """Finds existing user by telegram_id or creates a new user and identity atomically."""
-        stmt = (
-            select(User)
-            .options(selectinload(User.learning_profile))
-            .join(ExternalIdentity, User.user_id == ExternalIdentity.user_id)
-            .where(
-                ExternalIdentity.provider == "telegram",
-                ExternalIdentity.telegram_user_id == telegram_id,
+        now_ts = time.monotonic()
+        cached_entry = _telegram_user_id_cache.get(telegram_id)
+        user: User | None = None
+
+        if cached_entry and (now_ts < cached_entry[1]):
+            cached_user_id = cached_entry[0]
+            user = await session.get(User, cached_user_id, options=[selectinload(User.learning_profile)])
+
+        if not user:
+            stmt = (
+                select(User)
+                .options(selectinload(User.learning_profile))
+                .join(ExternalIdentity, User.user_id == ExternalIdentity.user_id)
+                .where(
+                    ExternalIdentity.provider == "telegram",
+                    ExternalIdentity.telegram_user_id == telegram_id,
+                )
             )
-        )
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
 
         if user:
-            # Keep a bounded activity heartbeat instead of updating this hot
-            # row and committing on every Telegram update.
+            _telegram_user_id_cache[telegram_id] = (user.user_id, now_ts + 300.0)
             now = datetime.now(UTC)
             if user.last_seen_at is None or (now - user.last_seen_at).total_seconds() >= 60:
                 if settings.REDIS_ENABLED and settings.TASK_WORKER_ENABLED:
@@ -140,13 +151,22 @@ class AccountService:
         )
         session.add(consent)
 
+        _telegram_user_id_cache[telegram_id] = (new_user.user_id, time.monotonic() + 300.0)
         logger.debug(f"Created new user {new_user.user_id} for telegram_id={telegram_id}")
         return new_user
 
     @staticmethod
     async def get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> User | None:
+        now_ts = time.monotonic()
+        cached_entry = _telegram_user_id_cache.get(telegram_id)
+        if cached_entry and (now_ts < cached_entry[1]):
+            cached_user = await session.get(User, cached_entry[0], options=[selectinload(User.learning_profile)])
+            if cached_user:
+                return cached_user
+
         stmt = (
             select(User)
+            .options(selectinload(User.learning_profile))
             .join(ExternalIdentity, User.user_id == ExternalIdentity.user_id)
             .where(
                 ExternalIdentity.provider == "telegram",
@@ -154,7 +174,10 @@ class AccountService:
             )
         )
         result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
+        if user:
+            _telegram_user_id_cache[telegram_id] = (user.user_id, now_ts + 300.0)
+        return user
 
     @staticmethod
     async def record_consent(

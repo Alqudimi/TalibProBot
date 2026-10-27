@@ -59,9 +59,8 @@ class UserRegistrationMiddleware(BaseMiddleware):
                 language_code=tg_user.language_code,
             )
             data["current_user"] = user
-            # The account lookup/heartbeat is a separate unit of work. End
-            # it before handlers call Telegram, so an idle network request
-            # does not keep a PostgreSQL connection checked out from the pool.
-            await session.commit()
+            # End unit of work if modified so idle network requests don't keep connections checked out.
+            if session.dirty or session.new:
+                await session.commit()
 
         return await handler(event, data)

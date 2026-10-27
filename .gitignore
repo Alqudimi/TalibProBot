@@ -14,7 +14,7 @@ ENV/
 logs/*.log
 !logs/.gitkeep
 *.log
-
+graphify-out
 # Sensitive credentials
 .env
 panel

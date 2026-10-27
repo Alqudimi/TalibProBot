@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 class ThrottlingMiddleware(BaseMiddleware):
     """Simple in-memory rate-limiting middleware to prevent rapid duplicate clicks."""
 
-    def __init__(self, rate_limit_seconds: float = 0.5) -> None:
+    def __init__(self, rate_limit_seconds: float = 0.15) -> None:
         self.rate_limit = rate_limit_seconds
         self.last_actions: OrderedDict[int, float] = OrderedDict()
         self.max_entries = 100_000

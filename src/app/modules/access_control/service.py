@@ -7,7 +7,10 @@ from sqlalchemy.orm import selectinload
 from src.app.modules.access_control.models import Permission, Role, RolePermission, UserRoleAssignment
 from src.app.observability.logging import get_logger
 
+import time
+
 logger = get_logger("access_control")
+_user_permissions_cache: dict[uuid.UUID, tuple[float, set[str]]] = {}
 
 
 class AccessControlService:
@@ -16,6 +19,11 @@ class AccessControlService:
     @staticmethod
     async def get_user_permissions(session: AsyncSession, user_id: uuid.UUID) -> set[str]:
         """Returns the set of permission codes currently held by the user."""
+        now_ts = time.monotonic()
+        cached = _user_permissions_cache.get(user_id)
+        if cached and (now_ts < cached[0]):
+            return cached[1]
+
         now = datetime.now(timezone.utc)
         stmt = (
             select(Permission.code)
@@ -28,7 +36,9 @@ class AccessControlService:
             )
         )
         result = await session.execute(stmt)
-        return set(result.scalars().all())
+        perms = set(result.scalars().all())
+        _user_permissions_cache[user_id] = (now_ts + 120.0, perms)
+        return perms
 
     @staticmethod
     async def has_permission(session: AsyncSession, user_id: uuid.UUID, permission_code: str) -> bool:
@@ -70,5 +80,6 @@ class AccessControlService:
         )
         session.add(assignment)
         await session.flush()
+        _user_permissions_cache.pop(user_id, None)
         logger.info(f"Assigned role '{role_code}' to user {user_id}")
         return assignment

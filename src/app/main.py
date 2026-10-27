@@ -34,7 +34,12 @@ async def main() -> None:
             try:
                 logger.info(f"Starting bot polling for @{settings.BOT_USERNAME}...")
                 await app.bot.delete_webhook(drop_pending_updates=True)
-                await app.dp.start_polling(app.bot, handle_signals=False)
+                used_updates = app.dp.resolve_used_update_types()
+                await app.dp.start_polling(
+                    app.bot,
+                    allowed_updates=used_updates,
+                    handle_signals=False,
+                )
                 break
             except asyncio.CancelledError:
                 break

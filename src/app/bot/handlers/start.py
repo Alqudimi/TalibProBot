@@ -55,16 +55,12 @@ async def _is_user_admin_or_provider(session: AsyncSession, user: User, tg_user_
     admin_ids = settings.ADMIN_TELEGRAM_IDS
     if isinstance(admin_ids, list) and tg_user_id in admin_ids:
         is_admin = True
-    else:
-        perms = await AccessControlService.get_user_permissions(session, user.user_id)
-        if "admin.super" in perms or "catalog.manage" in perms:
-            is_admin = True
 
-    is_provider = False
     perms = await AccessControlService.get_user_permissions(session, user.user_id)
-    if "service.provide" in perms:
-        is_provider = True
+    if not is_admin and ("admin.super" in perms or "catalog.manage" in perms):
+        is_admin = True
 
+    is_provider = "service.provide" in perms
     return is_admin, is_provider
 
 

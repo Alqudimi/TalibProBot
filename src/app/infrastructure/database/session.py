@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -17,11 +18,27 @@ logger = get_logger("database")
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
+_engine_loop: asyncio.AbstractEventLoop | None = None
 
 
 def get_engine() -> AsyncEngine:
-    global _engine
+    global _engine, _session_factory, _engine_loop
+    current_loop: asyncio.AbstractEventLoop | None = None
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    if _engine is not None and current_loop is not None and _engine_loop is not None and _engine_loop is not current_loop:
+        try:
+            _engine.sync_engine.dispose()
+        except Exception:
+            pass
+        _engine = None
+        _session_factory = None
+
     if _engine is None:
+        _engine_loop = current_loop
         db_url = settings.get_asyncpg_database_url()
         # Clean logging of DB connection without secrets
         safe_url = db_url.split("@")[-1] if "@" in db_url else "local"
@@ -90,9 +107,10 @@ async def check_db_health() -> bool:
 
 
 async def close_db_engine() -> None:
-    global _engine, _session_factory
+    global _engine, _session_factory, _engine_loop
     if _engine is not None:
         await _engine.dispose()
         _engine = None
         _session_factory = None
+        _engine_loop = None
         logger.info("Database engine connections disposed.")
