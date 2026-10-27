@@ -26,3 +26,17 @@ htmlcov/
 # IDE files
 .idea/
 .vscode/
+
+# Antigravity Runtime & Ephemeral State
+.gemini/
+*.tmp
+.scratch/*
+!.scratch/.gitkeep
+handoff.md
+# Credentials & MCP Secrets
+.agents/mcp_config.json
+!.agents/mcp_config.example.json
+.agents/plugins/**/mcp_config.json
+!.agents/plugins/**/mcp_config.example.json
+.env.*
+!.env.example
